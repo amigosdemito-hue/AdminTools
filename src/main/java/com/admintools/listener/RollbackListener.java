@@ -12,6 +12,9 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Copias automáticas para /rollback (entrada, salida, muerte, cambio de mundo e
  * intervalo).
@@ -47,9 +50,26 @@ public final class RollbackListener implements Listener {
         }
     }
 
+    /**
+     * Copia periódica repartida en varios tics.
+     *
+     * <p>Serializar el inventario de todo el servidor en un solo tic sería un tirón
+     * en cuanto haya gente conectada, así que cada jugador se procesa un tic después
+     * que el anterior. En 20 jugadores son 20 tics (un segundo), sin pausas visibles.</p>
+     */
     private void captureInterval() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            plugin.getInventoryBackups().capture(player, "INTERVAL");
+        List<Player> online = new ArrayList<>(Bukkit.getOnlinePlayers());
+        for (int index = 0; index < online.size(); index++) {
+            Player player = online.get(index);
+            if (index == 0) {
+                plugin.getInventoryBackups().capture(player, "INTERVAL");
+                continue;
+            }
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (player.isOnline()) {
+                    plugin.getInventoryBackups().capture(player, "INTERVAL");
+                }
+            }, index);
         }
     }
 
