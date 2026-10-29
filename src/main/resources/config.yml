@@ -1,0 +1,365 @@
+# ============================================================
+#  AdminTools — configuración principal
+#  Tras editar: /at reload  (o reinicia el servidor si cambias el storage)
+# ============================================================
+
+# Archivo de mensajes a usar: messages_es.yml o messages_en.yml
+language: es
+
+# Mostrar trazas completas en consola cuando algo falla (útil al depurar)
+debug: false
+
+# Nombre de esta instancia. Con MySQL compartido entre varios servidores,
+# sirve para saber en cuál ocurrió cada sanción o reporte. Vacío = nombre del servidor.
+server-name: ""
+
+# ------------------------------------------------------------
+#  Almacenamiento
+#  sqlite = un archivo en plugins/AdminTools/ (ideal 1 servidor)
+#  mysql  = base compartida (necesario para red de servidores)
+# ------------------------------------------------------------
+storage:
+  type: sqlite
+  mysql:
+    host: localhost
+    port: 3306
+    database: admintools
+    user: admintools
+    password: ""
+    # Parámetros extra de la conexión (se añaden tal cual a la URL JDBC)
+    parameters: "useSSL=false&characterEncoding=utf8&serverTimezone=UTC"
+    table-prefix: "sa_"
+  # Cuántas consultas pueden ejecutarse a la vez en paralelo.
+  # Con sqlite deja 1 (el archivo no soporta escrituras concurrentes).
+  pool-size: 1
+  # Retención de datos: se purga automáticamente lo viejo
+  retention:
+    chat-days: 30
+    ip-days: 60
+    audit-days: 180
+    # Cuántas copias de inventario se guardan por jugador
+    snapshots-per-player: 5
+    purge-interval-hours: 6
+
+# ------------------------------------------------------------
+#  Sanciones
+# ------------------------------------------------------------
+sanctions:
+  # Anunciar cada sanción a todo el servidor
+  broadcast: true
+  # Avisar al staff cuando entra un jugador sancionado
+  notify-staff-on-join: true
+  # Sancionar sin anunciarlo (solo lo ve el staff)
+  silent-by-default: false
+  # Mostrar la IP en el anuncio de IP-ban
+  show-ip-in-broadcast: false
+
+  # Días tras los que una advertencia deja de contar para el escalado
+  # (y para los contadores de /history). 0 = no caducan nunca.
+  # LiteBans usa 7; ponlo a 7 si quieres ese comportamiento.
+  warn-decay-days: 0
+
+  # Un miembro del staff no puede sancionar a alguien de su mismo rango
+  # o superior. La consola y quien tenga admintools.sanction.force se saltan
+  # esta protección.
+  protect-higher-ranks: true
+
+  # Duración máxima que cada rango puede aplicar.
+  # El plugin busca el límite más alto entre los permisos que tenga el staff.
+  duration-limits:
+    admintools.limit.new: 1d
+    admintools.limit.mod: 30d
+    admintools.limit.admin: permanent
+
+  # Escalado automático al acumular advertencias
+  auto-escalate:
+    enabled: true
+    window-days: 30
+    threshold: 3
+    action:
+      type: MUTE
+      duration: 1d
+      reason: "Acumulación de advertencias"
+
+  # Plantillas: /punish <plantilla> <jugador> [razón]
+  # type: BAN | IP_BAN | MUTE | SHADOW_MUTE | WARN | KICK
+  templates:
+    hacking:
+      type: IP_BAN
+      duration: permanent
+      reason: "Uso de clientes o módulos no permitidos (cheating)"
+    xray:
+      type: BAN
+      duration: 30d
+      reason: "Uso de rayos X / texturas de minerales"
+    grief:
+      type: BAN
+      duration: 7d
+      reason: "Griefing y destrucción de construcciones ajenas"
+    insultos:
+      type: MUTE
+      duration: 1d
+      reason: "Faltas de respeto a otros jugadores"
+    spam:
+      type: MUTE
+      duration: 1h
+      reason: "Spam en el chat"
+    publicidad:
+      type: MUTE
+      duration: 1d
+      reason: "Publicidad de otros servidores"
+    evadir-staff:
+      type: BAN
+      duration: 14d
+      reason: "Evadir al staff o desconectarse para evitar una sanción"
+
+  # Escaleras de sanciones: /ladder <escalera> <jugador> [razón]
+  # Van subiendo un paso por cada sanción previa dentro de la ventana.
+  ladders:
+    chat:
+      window-days: 30
+      steps:
+        - { type: WARN, reason: "Lenguaje inapropiado en el chat" }
+        - { type: MUTE, duration: 1h, reason: "Reincidencia: lenguaje inapropiado" }
+        - { type: MUTE, duration: 1d, reason: "Reincidencia: lenguaje inapropiado" }
+        - { type: MUTE, duration: 7d, reason: "Reincidencia: lenguaje inapropiado" }
+        - { type: BAN, duration: 7d, reason: "Reincidencia grave en el chat" }
+    publicidad:
+      window-days: 90
+      steps:
+        - { type: WARN, reason: "Publicidad de otros servidores" }
+        - { type: MUTE, duration: 1d, reason: "Reincidencia: publicidad" }
+        - { type: BAN, duration: 7d, reason: "Reincidencia: publicidad" }
+        - { type: IP_BAN, duration: permanent, reason: "Reincidencia grave: publicidad" }
+    cheating:
+      window-days: 365
+      steps:
+        - { type: BAN, duration: 7d, reason: "Uso de clientes no permitidos (primer aviso)" }
+        - { type: IP_BAN, duration: permanent, reason: "Reincidencia: cheating" }
+
+# ------------------------------------------------------------
+#  Chat
+# ------------------------------------------------------------
+chat:
+  # Formato del chat normal (MiniMessage). %player%, %message%, %prefix% (LuckPerms/PAPI)
+  format:
+    enabled: false
+    format: "%prefix%<white>%player%<gray>: <reset>%message%"
+  # Cooldown entre mensajes de un mismo jugador
+  cooldown-seconds: 3
+  # Modo lento global con el que arranca el servidor (se cambia en vivo con /slowmode)
+  slowmode-seconds: 0
+  # Mayúsculas: mensajes de más de min-length con más de max-percent en mayúsculas
+  anti-caps:
+    enabled: true
+    min-length: 12
+    max-percent: 70
+  # Mensajes repetidos o demasiado seguidos
+  anti-spam:
+    enabled: true
+    window-seconds: 10
+    max-similar: 3
+  # Publicidad: dominios, IPs, invitaciones a otros servidores
+  anti-advertising:
+    enabled: true
+    notify-staff: true
+    # Aplica automáticamente la escalera 'publicidad' tras N detecciones
+    punish-after: 2
+  # Filtros regex de palabras: se avisa al staff y se bloquea el mensaje
+  filters:
+    - "(?i)\\b(puta|puto|mierda|pelotudo|boludo)\\b"
+  # Comandos bloqueados para jugadores sin permiso (evita fugas de información)
+  blocked-commands:
+    - "/plugins"
+    - "/pl"
+    - "/version"
+    - "/ver"
+    - "/bukkit:plugins"
+    - "/about"
+  # Registro de chat para /chatlog y /case
+  log:
+    enabled: true
+
+# ------------------------------------------------------------
+#  Reportes
+# ------------------------------------------------------------
+reports:
+  cooldown-seconds: 120
+  max-open-per-player: 3
+  notify-staff: true
+  # Si es true, el reportero queda oculto en la cola
+  anonymous: false
+  # Solo se puede reportar a jugadores online
+  require-online-target: true
+
+# ------------------------------------------------------------
+#  Anti-abuso / cuentas alternativas
+# ------------------------------------------------------------
+alts:
+  enabled: true
+  # Exención para IPs compartidas (CGNAT, residencias, bibliotecas)
+  cgnat-exempt: false
+  # Bloquear la entrada de una segunda cuenta desde la misma IP
+  block-multi-account: false
+  # Avisar al staff cuando entra una cuenta nueva que comparte IP
+  notify-staff-on-new-alt: true
+
+# ------------------------------------------------------------
+#  Salud del servidor (watchdog)
+# ------------------------------------------------------------
+watchdog:
+  enabled: true
+  interval-seconds: 15
+  thresholds:
+    tps-warn: 18.0
+    tps-critical: 15.0
+    mspt-warn: 45.0
+    mspt-critical: 60.0
+    memory-warn-percent: 85.0
+    memory-critical-percent: 92.0
+    disk-warn-percent: 90.0
+  # No repetir la misma alerta antes de estos minutos
+  alert-cooldown-minutes: 10
+  # Enviar también las alertas a Discord
+  discord: true
+
+# ------------------------------------------------------------
+#  Reinicio programado
+# ------------------------------------------------------------
+restart:
+  enabled: false
+  # Horas del día (formato HH:mm, hora local del servidor)
+  times:
+    - "05:00"
+  # Avisos antes del reinicio, en segundos
+  warnings-seconds: [600, 300, 60, 30, 10]
+  # Comando del sistema a ejecutar como reinicio.
+  # Vacío = Bukkit.shutdown() (usá run/start.sh con bucle para reiniciar de verdad).
+  command: ""
+
+# ------------------------------------------------------------
+#  Copias de seguridad
+# ------------------------------------------------------------
+backups:
+  enabled: false
+  interval-hours: 6
+  # Cuántas copias se conservan (las más viejas se borran)
+  keep: 5
+  worlds: true
+  plugins-config: true
+  folder: backups
+
+# ------------------------------------------------------------
+#  Discord (alertas por webhook)
+#  El URL es un secreto: no lo compartas ni lo subas al repositorio.
+# ------------------------------------------------------------
+discord:
+  enabled: false
+  webhook-url: ""
+  username: "AdminTools"
+  avatar-url: ""
+  events:
+    ban: true
+    mute: true
+    kick: true
+    warn: true
+    report: true
+    watchdog: true
+
+# ------------------------------------------------------------
+#  Herramientas de staff
+# ------------------------------------------------------------
+staff:
+  # Con vanish activo, ¿puede recoger ítems del suelo?
+  # En false (recomendado) no se llena el inventario sin querer ni se pierde el ítem.
+  vanish-pickup: false
+  # Con vanish activo, abrir contenedores sin animación ni sonido para los demás:
+  # cofres, barriles, shulkers, hornos, tolvas, alambiques, enderchest, mesas de
+  # trabajo, yunques, encantamientos, cortapiedras, telares, y barcas/vagonetas
+  # con inventario. La interfaz la sigue viendo solo el staff.
+  vanish-silent-containers: true
+  # Límite de acciones sensibles (sanciones, limpiezas, restores...) por minuto
+  # y por miembro del staff. Frena un ban masivo desde una cuenta comprometida.
+  # Quien tenga admintools.staff.limit.bypass se lo salta.
+  action-limit:
+    enabled: true
+    max-per-minute: 40
+  # Modo staff (/staffmode): vuelo, invulnerabilidad y hotbar de herramientas.
+  mode:
+    # Reemplaza la barra rápida por las herramientas (el inventario se guarda
+    # en una copia persistente y se devuelve al salir).
+    give-tools: true
+    # Impide recoger ítems del suelo mientras el modo staff está activo.
+    block-pickup: true
+
+# ------------------------------------------------------------
+#  Cárcel
+# ------------------------------------------------------------
+jail:
+  enabled: true
+  # Celda que se usa cuando /jail no indica una y no hay otra mejor.
+  default: "spawn"
+  # Duración por defecto de una condena: "permanent" o 30m, 2h, 7d...
+  default-duration: "permanent"
+  # Si el preso se sale de la celda, vuelve dentro y el staff recibe un aviso.
+  return-on-escape: true
+  # Avisar al staff de cada ingreso, salida y fuga.
+  notify-staff: true
+  # Al cumplir la condena vuelve a donde estaba. En false, al spawn del mundo principal.
+  release-to-original: true
+  # Sin daño dentro de la cárcel (ni recibido ni infligido).
+  block-damage: true
+  # Al encarcelar se le guarda el inventario completo (armadura y mano secundaria
+  # incluidas) y se le devuelve exacto al salir, sin duplicados.
+  confiscate-inventory: true
+  # Radio por defecto de /setjail (en bloques, desde el punto de la celda).
+  # 2 = área cuadrada de 5x5: quien se sale vuelve dentro al instante.
+  default-radius: 2
+  # Poner al preso en modo aventura mientras dure la condena. El cliente deja de
+  # romper/colocar bloques (sin bloques fantasma en Bedrock) y se le devuelve su
+  # modo de juego original al salir.
+  adventure-mode: true
+  # Comandos que un preso puede seguir usando. Los de login van incluidos a propósito:
+  # bloquearlos dejaría al jugador sin poder autenticarse y quedaría atrapado.
+  allowed-commands:
+    - login
+    - register
+    - l
+    - reg
+    - auth
+    - changepassword
+
+# NOTA: el tiempo de condena baja sólo mientras el preso está conectado
+# (comportamiento clásico de xJail), y se guarda al salir y cada 30 segundos.
+
+# ------------------------------------------------------------
+#  Rollback de inventarios (/rollback)
+# ------------------------------------------------------------
+rollback:
+  enabled: true
+  # Cuándo se guarda una copia completa (inventario, enderchest, posición y stats).
+  events:
+    join: true
+    quit: true
+    death: true
+    world-change: true
+  # Copia automática cada N minutos a todos los conectados (0 = desactivado).
+  interval-minutes: 0
+  # Copias que se conservan por jugador y motivo; las viejas se borran solas.
+  keep:
+    death: 30
+    join: 10
+    quit: 10
+    manual: 20
+  # Copias por página en /rollback <jugador>
+  page-size: 8
+
+# ------------------------------------------------------------
+#  Integraciones (se activan solas si el plugin está instalado)
+# ------------------------------------------------------------
+integrations:
+  luckperms: true
+  coreprotect: true
+  placeholderapi: true
+  # Reenviar al staff las alertas de anticheats detectados (Vulcan, Grim, ...)
+  anticheat-alerts: true

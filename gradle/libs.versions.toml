@@ -1,0 +1,44 @@
+# ============================================================
+#  Catálogo de versiones (Gradle Version Catalog)
+#  Todo lo que se descarga para este proyecto se fija AQUÍ.
+#  Para subir de versión: editas este archivo y ejecutas `./gradlew build`.
+# ============================================================
+
+[versions]
+# --- Minecraft / Paper ---
+# Línea mínima soportada: Paper 26.1 (= la más baja que queremos que lo cargue).
+# Formato nuevo de Paper: <version-mc>.build.<build>-<canal>
+paperApi = "26.1.2.build.74-stable"
+# Versión que descarga el servidor de pruebas de `./gradlew runServer`
+paperServer = "26.1.2"
+
+# --- Librerías ---
+bstats = "3.2.1"
+# Versiones que el propio Paper sirve en runtime (libraries/): se compilan
+# como compileOnly y NO se empaquetan en el jar.
+sqliteJdbc = "3.49.1.0"
+mysqlConnector = "9.2.0"
+placeholderApi = "2.11.6"
+
+# --- Pruebas ---
+# JUnit 5: pruebas de la lógica que no necesita un servidor (tiempos, textos,
+# geometría de la cárcel...). No se empaqueta en el jar.
+junit = "5.14.4"
+junitPlatform = "1.14.4"
+
+# --- Plugins de Gradle ---
+runPaper = "3.1.0"   # descarga y arranca un servidor Paper de pruebas
+shadow = "9.6.1"     # construye el jar "gordo" (fat jar) con relocación
+
+[libraries]
+paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paperApi" }
+bstats-bukkit = { module = "org.bstats:bstats-bukkit", version.ref = "bstats" }
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqliteJdbc" }
+mysql-connector = { module = "com.mysql:mysql-connector-j", version.ref = "mysqlConnector" }
+placeholderapi = { module = "me.clip:placeholderapi", version.ref = "placeholderApi" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }
+
+[plugins]
+run-paper = { id = "xyz.jpenilla.run-paper", version.ref = "runPaper" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

@@ -1,0 +1,647 @@
+# ============================================================
+#  AdminTools — descriptor del plugin
+#  api-version 26.1 => sólo carga en Paper 26.1 o superior.
+# ============================================================
+name: AdminTools
+version: '${version}'
+description: '${description}'
+author: '${author}'
+prefix: AdminTools
+main: com.admintools.AdminToolsPlugin
+api-version: '26.1'
+
+# Integraciones opcionales: si están instaladas, el plugin se engancha solo.
+softdepend:
+  - LuckPerms
+  - Vault
+  - CoreProtect
+  - PlaceholderAPI
+  - Essentials
+  - EssentialsX
+  - Vulcan
+  - Grim
+  - Matrix
+  - Spartan
+  - Polar
+
+commands:
+  # ---------- núcleo ----------
+  admintools:
+    description: 'Comando raíz de AdminTools (ayuda, estado, recarga, módulos)'
+    aliases: [at, atool]
+    usage: /admintools help
+
+  # ---------- sanciones ----------
+  ban:
+    description: 'Banea permanentemente o aplica la plantilla por defecto'
+    permission: admintools.sanction.ban
+    usage: /ban <jugador> [razón]
+  tempban:
+    description: 'Banea temporalmente a un jugador'
+    permission: admintools.sanction.ban
+    usage: /tempban <jugador> <duración> [razón]
+  ipban:
+    description: 'Banea una IP (y al jugador si está online)'
+    permission: admintools.sanction.ipban
+    usage: /ipban <jugador|ip> [razón]
+  unban:
+    description: 'Quita el ban a un jugador'
+    permission: admintools.sanction.unban
+    usage: /unban <jugador> [razón]
+  mute:
+    description: 'Silencia permanentemente a un jugador'
+    permission: admintools.sanction.mute
+    usage: /mute <jugador> [razón]
+  tempmute:
+    description: 'Silencia temporalmente a un jugador'
+    permission: admintools.sanction.mute
+    usage: /tempmute <jugador> <duración> [razón]
+  ipmute:
+    description: 'Silencia una IP (y al jugador si está online)'
+    permission: admintools.sanction.ipmute
+    usage: /ipmute <jugador|ip> [duración] [razón]
+  unmute:
+    description: 'Quita el mute a un jugador o a una IP'
+    permission: admintools.sanction.unmute
+    usage: /unmute <jugador> [razón]
+  shadowmute:
+    description: 'Silencio fantasma: el jugador cree que habla, nadie lo lee'
+    permission: admintools.sanction.shadowmute
+    usage: /shadowmute <jugador> [duración] [razón]
+  warn:
+    description: 'Advierte a un jugador (queda en su historial)'
+    permission: admintools.sanction.warn
+    usage: /warn <jugador> [razón]
+  tempwarn:
+    description: 'Advierte a un jugador durante un tiempo limitado'
+    permission: admintools.sanction.warn
+    usage: /tempwarn <jugador> <duración> [razón]
+  kick:
+    description: 'Expulsa a un jugador del servidor'
+    permission: admintools.sanction.kick
+    usage: /kick <jugador> [razón]
+  history:
+    description: 'Historial completo de sanciones de un jugador'
+    aliases: [hist, punishments]
+    permission: admintools.sanction.history
+    usage: /history <jugador> [página]
+  notes:
+    description: 'Notas internas de staff sobre un jugador'
+    aliases: [note]
+    permission: admintools.sanction.notes
+    usage: /notes <jugador|add|remove> [texto|id]
+  punish:
+    description: 'Aplica una plantilla de sanción guardada en la config'
+    aliases: [template]
+    permission: admintools.sanction.templates
+    usage: /punish <plantilla> <jugador> [razón]
+  ladder:
+    description: 'Aplica el siguiente paso de una escalera de sanciones'
+    permission: admintools.sanction.ladder
+    usage: /ladder <escalera> <jugador> [razón]
+  unpunish:
+    description: 'Revierte sanciones activas (de un jugador o de un staff)'
+    permission: admintools.sanction.rollback
+    usage: /unpunish <jugador|staff> <nombre> [razón]
+
+  # ---------- herramientas de staff ----------
+  vanish:
+    description: 'Te vuelve invisible para los jugadores normales'
+    aliases: [v]
+    permission: admintools.staff.vanish
+    usage: /vanish [jugador]
+  freeze:
+    description: 'Congela a un jugador (no se puede mover ni interactuar)'
+    permission: admintools.staff.freeze
+    usage: /freeze <jugador>
+  staffchat:
+    description: 'Canal de chat sólo para el staff'
+    aliases: [sc]
+    permission: admintools.staff.staffchat
+    usage: /staffchat <mensaje>
+  spy:
+    description: 'Ve los mensajes privados de otros jugadores'
+    aliases: [socialspy]
+    permission: admintools.staff.spy
+    usage: /spy
+  cspy:
+    description: 'Ve los comandos que ejecutan los jugadores'
+    aliases: [commandspy]
+    permission: admintools.staff.spy.command
+    usage: /cspy
+  stafflist:
+    description: 'Lista el staff online y su modo actual'
+    aliases: [staff]
+    permission: admintools.staff.list
+    usage: /stafflist
+  duty:
+    description: 'Entra o sale de servicio (on/off duty)'
+    permission: admintools.staff.duty
+    usage: /duty
+  staffmode:
+    description: 'Modo staff: vuelo, invulnerabilidad y herramientas'
+    aliases: [smode, staffm]
+    permission: admintools.staff.mode
+    usage: /staffmode [jugador|on|off]
+  follow:
+    description: 'Sigue a un jugador (teletransporte continuo)'
+    permission: admintools.staff.follow
+    usage: /follow <jugador|stop>
+  seen:
+    description: 'Última conexión y tiempo jugado de un jugador'
+    permission: admintools.staff.seen
+    usage: /seen <jugador>
+  playtime:
+    description: 'Tiempo jugado y número de conexiones de un jugador'
+    aliases: [ptime]
+    permission: admintools.staff.seen
+    usage: /playtime [jugador]
+  invsee:
+    description: 'Abre el inventario de un jugador (online u offline)'
+    aliases: [inv]
+    permission: admintools.staff.invsee
+    usage: /invsee <jugador>
+  enderchest:
+    description: 'Abre el enderchest de un jugador'
+    aliases: [ec]
+    permission: admintools.staff.enderchest
+    usage: /enderchest <jugador>
+  heal:
+    description: 'Cura a un jugador (o a ti)'
+    permission: admintools.staff.utility
+    usage: /heal [jugador]
+  feed:
+    description: 'Alimenta a un jugador (o a ti)'
+    permission: admintools.staff.utility
+    usage: /feed [jugador]
+  fly:
+    description: 'Activa o desactiva el vuelo'
+    permission: admintools.staff.utility
+    usage: /fly [jugador]
+  god:
+    description: 'Activa o desactiva la invulnerabilidad'
+    permission: admintools.staff.utility
+    usage: /god [jugador]
+  gamemode:
+    description: 'Cambia el modo de juego'
+    aliases: [gm]
+    permission: admintools.staff.utility
+    usage: /gamemode <modo> [jugador]
+  clear:
+    description: 'Vacía el inventario de un jugador'
+    aliases: [ci]
+    permission: admintools.staff.utility
+    usage: /clear [jugador]
+  tp:
+    description: 'Teletransporte a un jugador'
+    permission: admintools.staff.teleport
+    usage: /tp <jugador>
+  tphere:
+    description: 'Trae a un jugador hasta ti'
+    permission: admintools.staff.teleport
+    usage: /tphere <jugador>
+  tppos:
+    description: 'Teletransporte a coordenadas'
+    permission: admintools.staff.teleport
+    usage: /tppos <x> <y> <z> [mundo]
+  back:
+    description: 'Vuelve a tu última posición'
+    permission: admintools.staff.teleport
+    usage: /back
+
+  # ---------- cárcel ----------
+  jail:
+    description: 'Encarcela a un jugador (con duración y celda opcionales)'
+    permission: admintools.jail.use
+    usage: /jail <jugador> [duración] [cárcel] [motivo]
+  unjail:
+    description: 'Libera a un jugador de la cárcel'
+    permission: admintools.jail.use
+    usage: /unjail <jugador> [motivo]
+  jailtime:
+    description: 'Tiempo de condena que le queda (sin argumentos: el tuyo)'
+    usage: /jailtime [jugador]
+  jaillist:
+    description: 'Lista de presos y su condena'
+    permission: admintools.jail.view
+    usage: /jaillist
+  setjail:
+    description: 'Crea una cárcel en tu posición'
+    permission: admintools.jail.manage
+    usage: /setjail <nombre> [radio]
+  deljail:
+    description: 'Borra una cárcel vacía'
+    permission: admintools.jail.manage
+    usage: /deljail <nombre>
+  jails:
+    description: 'Lista las cárceles configuradas'
+    permission: admintools.jail.view
+    usage: /jails
+  jailtp:
+    description: 'Te lleva a la celda de un preso'
+    permission: admintools.jail.use
+    usage: /jailtp <jugador>
+  jailimport:
+    description: 'Importa cárceles y presos desde xJail'
+    permission: admintools.jail.import
+    usage: /jailimport [ruta|xjail] [--dry]
+
+  # ---------- rollback de inventarios ----------
+  rollback:
+    description: 'Copias completas del jugador: listar, previsualizar y restaurar'
+    permission: admintools.rollback.view
+    usage: /rollback [jugador [página|#id [confirm|delete [partes]]]] | save <jugador> | purge <días>
+
+  # ---------- reportes ----------
+  report:
+    description: 'Reporta a un jugador para que el staff lo revise'
+    permission: admintools.report
+    usage: /report <jugador> <motivo>
+  reports:
+    description: 'Cola de reportes del staff'
+    aliases: [rq, reportqueue]
+    permission: admintools.report.staff
+    usage: /reports [claim|resolve|reject|info] [id] [nota]
+
+  # ---------- chat ----------
+  chatlog:
+    description: 'Últimos mensajes de un jugador'
+    aliases: [cl]
+    permission: admintools.chat.log
+    usage: /chatlog <jugador> [cantidad]
+  clearchat:
+    description: 'Limpia el chat de todos los jugadores'
+    aliases: [cc]
+    permission: admintools.chat.clear
+    usage: /clearchat [líneas]
+  slowmode:
+    description: 'Limita la frecuencia de chat global'
+    aliases: [sm]
+    permission: admintools.chat.slowmode
+    usage: /slowmode <segundos|off>
+  muteall:
+    description: 'Silencia el chat de todo el servidor'
+    permission: admintools.chat.muteall
+    usage: /muteall [on|off]
+
+  # ---------- investigación ----------
+  check:
+    description: 'Ficha unificada de un jugador (sanciones, notas, alts, anticheat)'
+    permission: admintools.investigate.check
+    usage: /check <jugador>
+  alts:
+    description: 'Cuentas que comparten IP con un jugador'
+    permission: admintools.investigate.alts
+    usage: /alts <jugador|ip> [ip]
+  case:
+    description: 'Expediente unificado: sanciones + notas + reportes + chat'
+    permission: admintools.investigate.case
+    usage: /case <jugador>
+  snapshot:
+    description: 'Copias de inventario guardadas de un jugador'
+    aliases: [snap]
+    permission: admintools.investigate.snapshot
+    usage: /snapshot <jugador> [save|list|view|restore] [id]
+  restore:
+    description: 'Restaura un inventario guardado'
+    permission: admintools.investigate.restore
+    usage: /restore <jugador> <id>
+
+  # ---------- operación ----------
+  maintenance:
+    description: 'Modo mantenimiento (sólo entran los autorizados)'
+    aliases: [maint]
+    permission: admintools.ops.maintenance
+    usage: /maintenance [on|off|status]
+  restart:
+    description: 'Reinicio programado con avisos'
+    permission: admintools.ops.restart
+    usage: /restart [cancel|<segundos>|now]
+  backup:
+    description: 'Copia de seguridad de mundos y configuración'
+    permission: admintools.ops.backup
+    usage: /backup [list|now]
+  audit:
+    description: 'Registro de acciones del staff'
+    permission: admintools.ops.audit
+    usage: /audit [jugador] [página]
+  watchdog:
+    description: 'Estado de salud del servidor (TPS, MSPT, RAM, disco)'
+    permission: admintools.ops.watchdog
+    usage: /watchdog [status|test]
+
+permissions:
+  # ============================================================
+  #  Rangos (se otorgan con LuckPerms; los hijos ya están definidos)
+  # ============================================================
+  admintools.helper:
+    description: 'Rango Helper — sanciones ligeras, staff tools básicas y reportes'
+    default: op
+    children:
+      admintools.sanction.warn: true
+      admintools.sanction.mute: true
+      admintools.sanction.unmute: true
+      admintools.sanction.kick: true
+      admintools.sanction.history: true
+      admintools.sanction.notes: true
+      admintools.limit.new: true
+      admintools.staff.vanish: true
+      admintools.staff.vanish.see: true
+      admintools.staff.freeze: true
+      admintools.staff.staffchat: true
+      admintools.staff.seen: true
+      admintools.staff.list: true
+      admintools.staff.teleport: true
+      admintools.staff.follow: true
+      admintools.jail.use: true
+      admintools.jail.view: true
+      admintools.report.staff: true
+      admintools.report.claim: true
+      admintools.chat.log: true
+      admintools.investigate.check: true
+  admintools.moderator:
+    description: 'Rango Moderador — bans temporales, staff mode completo e investigación'
+    default: op
+    children:
+      admintools.helper: true
+      admintools.sanction.ban: true
+      admintools.sanction.unban: true
+      admintools.sanction.ladder: true
+      admintools.sanction.templates: true
+      admintools.sanction.shadowmute: true
+      admintools.sanction.notes.add: true
+      admintools.limit.mod: true
+      admintools.staff.spy: true
+      admintools.staff.spy.command: true
+      admintools.staff.duty: true
+      admintools.staff.mode: true
+      admintools.staff.invsee: true
+      admintools.staff.invsee.modify: true
+      admintools.staff.enderchest: true
+      admintools.staff.enderchest.modify: true
+      admintools.staff.utility: true
+      admintools.report.manage: true
+      admintools.chat.clear: true
+      admintools.chat.slowmode: true
+      admintools.investigate.alts: true
+      admintools.investigate.snapshot: true
+      admintools.jail.manage: true
+      admintools.rollback.view: true
+      admintools.rollback.restore: true
+      admintools.rollback.save: true
+  admintools.admin:
+    description: 'Rango Admin — control total del plugin'
+    default: op
+    children:
+      admintools.moderator: true
+      admintools.limit.admin: true
+      admintools.sanction.ipban: true
+      admintools.sanction.ipmute: true
+      admintools.sanction.rollback: true
+      admintools.staff.mode.others: true
+      admintools.chat.muteall: true
+      admintools.chat.filter.bypass: true
+      admintools.chat.cooldown.bypass: true
+      admintools.investigate.alts.ip: true
+      admintools.investigate.restore: true
+      admintools.ops.maintenance: true
+      admintools.ops.maintenance.bypass: true
+      admintools.ops.restart: true
+      admintools.jail.import: true
+      admintools.rollback.purge: true
+      admintools.ops.backup: true
+      admintools.ops.audit: true
+      admintools.ops.watchdog: true
+      admintools.ops.reload: true
+
+  # ============================================================
+  #  Nodos sueltos (defaults, exenciones y jugadores)
+  # ============================================================
+  admintools.report:
+    description: 'Permite usar /report (todos los jugadores)'
+    default: true
+  admintools.report.bypass-cooldown:
+    description: 'Ignora el cooldown de reportes'
+    default: false
+  admintools.report.staff:
+    description: 'Ver la cola de reportes (/reports)'
+    default: op
+  admintools.report.claim:
+    description: 'Reclamar un reporte de la cola'
+    default: op
+  admintools.report.manage:
+    description: 'Resolver, rechazar o anotar reportes'
+    default: op
+  admintools.limit.new:
+    description: 'Límite de duración de sanciones del rango nuevo (config: sanctions.duration-limits)'
+    default: false
+  admintools.limit.mod:
+    description: 'Límite de duración de sanciones del rango moderador'
+    default: false
+  admintools.limit.admin:
+    description: 'Límite de duración de sanciones del rango admin (permanente)'
+    default: op
+  admintools.sanction.ban:
+    description: 'Usar /ban y /tempban (respetando el límite de duración del rango)'
+    default: op
+  admintools.sanction.mute:
+    description: 'Usar /mute y /tempmute'
+    default: op
+  admintools.sanction.unban:
+    description: 'Usar /unban y /unmute'
+    default: op
+  admintools.sanction.unmute:
+    description: 'Usar /unmute'
+    default: op
+  admintools.sanction.ipban:
+    description: 'Banear IPs'
+    default: op
+  admintools.sanction.ipmute:
+    description: 'Silenciar IPs'
+    default: op
+  admintools.sanction.warn:
+    description: 'Advertir jugadores'
+    default: op
+  admintools.sanction.kick:
+    description: 'Expulsar jugadores'
+    default: op
+  admintools.sanction.shadowmute:
+    description: 'Aplicar silencios fantasma'
+    default: op
+  admintools.sanction.history:
+    description: 'Ver el historial de sanciones'
+    default: op
+  admintools.sanction.notes:
+    description: 'Ver notas de staff'
+    default: op
+  admintools.sanction.notes.add:
+    description: 'Añadir y borrar notas de staff'
+    default: op
+  admintools.sanction.templates:
+    description: 'Aplicar plantillas de sanción'
+    default: op
+  admintools.sanction.ladder:
+    description: 'Aplicar escaleras de sanciones'
+    default: op
+  admintools.sanction.rollback:
+    description: 'Revertir sanciones en masa (cuenta de staff comprometida)'
+    default: op
+  admintools.staff.vanish:
+    description: 'Usar /vanish'
+    default: op
+  admintools.staff.vanish.see:
+    description: 'Ver a los jugadores en vanish'
+    default: op
+  admintools.staff.freeze:
+    description: 'Congelar y descongelar jugadores'
+    default: op
+  admintools.staff.staffchat:
+    description: 'Usar el chat de staff'
+    default: op
+  admintools.staff.spy:
+    description: 'Espiar mensajes privados (/tell, /msg, /w...)'
+    default: op
+  admintools.staff.spy.command:
+    description: 'Espiar comandos ejecutados'
+    default: op
+  admintools.staff.list:
+    description: 'Ver la lista de staff online'
+    default: op
+  admintools.staff.duty:
+    description: 'Activar el modo servicio'
+    default: op
+  admintools.staff.mode:
+    description: 'Entrar en el modo staff (vuelo, invulnerabilidad y herramientas)'
+    default: op
+  admintools.staff.mode.others:
+    description: 'Activar o desactivar el modo staff de otro jugador'
+    default: op
+  admintools.staff.seen:
+    description: 'Consultar última conexión y tiempo jugado'
+    default: op
+  admintools.staff.invsee:
+    description: 'Ver inventarios (online y offline)'
+    default: op
+  admintools.staff.invsee.modify:
+    description: 'Modificar el inventario que se está viendo'
+    default: op
+  admintools.staff.enderchest:
+    description: 'Ver enderchests'
+    default: op
+  admintools.staff.enderchest.modify:
+    description: 'Modificar el enderchest que se está viendo'
+    default: op
+  admintools.staff.utility:
+    description: 'Comandos de utilidad (heal, feed, fly, god, gamemode, clear)'
+    default: op
+  admintools.staff.teleport:
+    description: 'Teletransportes de staff (tp, tphere, tppos, back)'
+    default: op
+  admintools.staff.follow:
+    description: 'Seguir a un jugador con /follow'
+    default: op
+  admintools.staff.teleport.exempt:
+    description: 'No se puede teletransportar a este jugador'
+    default: false
+  admintools.staff.limit.bypass:
+    description: 'Ignora el límite de acciones por minuto del staff'
+    default: false
+  admintools.chat.log:
+    description: 'Ver el registro de chat'
+    default: op
+  admintools.chat.clear:
+    description: 'Limpiar el chat'
+    default: op
+  admintools.chat.slowmode:
+    description: 'Cambiar el modo lento'
+    default: op
+  admintools.chat.muteall:
+    description: 'Silenciar el chat global'
+    default: op
+  admintools.chat.filter.bypass:
+    description: 'Ignorar los filtros de chat (no hace falta para el staff)'
+    default: false
+  admintools.chat.cooldown.bypass:
+    description: 'Ignorar el cooldown de chat'
+    default: false
+  admintools.investigate.check:
+    description: 'Ficha unificada de jugador'
+    default: op
+  admintools.investigate.alts:
+    description: 'Ver cuentas alternativas'
+    default: op
+  admintools.investigate.alts.ip:
+    description: 'Ver las IPs en /alts (dato sensible)'
+    default: op
+  admintools.investigate.case:
+    description: 'Ver expedientes de jugador'
+    default: op
+  admintools.investigate.snapshot:
+    description: 'Ver y crear copias de inventario'
+    default: op
+  admintools.investigate.restore:
+    description: 'Restaurar inventarios guardados'
+    default: op
+  admintools.ops.maintenance:
+    description: 'Activar el modo mantenimiento'
+    default: op
+  admintools.ops.maintenance.bypass:
+    description: 'Entrar mientras el servidor está en mantenimiento'
+    default: op
+  admintools.ops.restart:
+    description: 'Programar reinicios'
+    default: op
+  admintools.ops.backup:
+    description: 'Crear y listar copias de seguridad'
+    default: op
+  admintools.ops.audit:
+    description: 'Consultar el registro de auditoría'
+    default: op
+  admintools.jail.use:
+    description: 'Encarcelar, liberar y visitar presos'
+    default: op
+  admintools.jail.view:
+    description: 'Ver presos, celdas y tiempo restante'
+    default: op
+  admintools.jail.manage:
+    description: 'Crear y borrar cárceles (/setjail, /deljail)'
+    default: op
+  admintools.jail.import:
+    description: 'Importar datos desde xJail'
+    default: op
+  admintools.jail.bypass:
+    description: 'Ignora las restricciones de la cárcel'
+    default: false
+  admintools.jail.exempt:
+    description: 'No se puede encarcelar a este jugador'
+    default: false
+  admintools.rollback.view:
+    description: 'Listar y previsualizar copias de inventario'
+    default: op
+  admintools.rollback.restore:
+    description: 'Restaurar copias de inventario'
+    default: op
+  admintools.rollback.save:
+    description: 'Crear copias manuales'
+    default: op
+  admintools.rollback.purge:
+    description: 'Borrar copias antiguas'
+    default: op
+  admintools.ops.watchdog:
+    description: 'Ver el estado de salud del servidor'
+    default: op
+  admintools.ops.reload:
+    description: 'Recargar la configuración y los mensajes'
+    default: op
+  admintools.anticheat.report:
+    description: 'Puente para que un anticheat envíe sus flags (/at acalert)'
+    default: op
+  admintools.exempt.freeze:
+    description: 'No se puede congelar a este jugador'
+    default: false
+  admintools.exempt.sanctions:
+    description: 'No puede ser sancionado por otros staff'
+    default: false
+  admintools.sanction.force:
+    description: 'Ignora la jerarquía de rangos y puede sancionar a un rango igual o superior'
+    default: false
