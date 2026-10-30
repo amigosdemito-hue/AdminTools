@@ -12,14 +12,14 @@ aún**: este documento es el preparado para que la subida sea un solo repaso.
 | Repositorio git inicializado (`main`, 3 commits) | ✅ |
 | `.gitignore` (Gradle, IDE, `run/`, logs, base de datos, secretos) | ✅ |
 | Integración continua (`build.yml`: compila + pruebas en cada push) | ✅ |
-| `LICENSE` (MIT) | ✅ |
+| `LICENSE` (todos los derechos reservados: público, no código abierto) | ✅ |
 | `CHANGELOG.md` | ✅ |
 | `README.md` con instalación, rangos y configuración | ✅ |
 | Manual de rangos (`docs/ROL-*.md`) y comandos (`docs/COMANDOS-Y-PERMISOS.md`) | ✅ |
 | Tests (`./gradlew build`) | ✅ 43 pruebas |
-| Remoto de GitHub | ❌ pendiente de la subida |
+| Remoto de GitHub | ⏳ pendiente de la subida |
 | `release.yml` (jar adjunto en cada etiqueta) | ✅ listo, se dispara con `git tag` |
-| Proyecto publicado en Modrinth | ❌ pendiente de la subida |
+| Proyecto publicado en Modrinth | ⏳ pendiente: slug `admintools` ocupado, se usa **`admintools-suite`** y falta un PAT válido |
 
 ---
 
@@ -40,10 +40,8 @@ ls build/libs/               # debe salir AdminTools-<versión>.jar y un -plain.
 ## 2. GitHub
 
 ```bash
-# 1) primer push (una sola vez)
-git remote add origin https://github.com/<tu-usuario>/AdminTools.git
-git add . && git commit -m "Docs de rangos y material de release 0.5.1"
-git push -u origin main
+# 1) primer push (una sola vez) — GitHub CLI ya autenticado como amigosdemito-hue
+gh repo create AdminTools --public --source . --remote origin --push
 
 # 2) etiqueta de versión (dispara release.yml y publica la release con el jar)
 git tag v0.5.1
@@ -52,9 +50,8 @@ git push origin v0.5.1
 
 - El workflow `.github/workflows/release.yml` compila con Java 25, sube el jar como artefacto de la
   release `v0.5.1` y pone en el cuerpo el bloque `## [0.5.1]` del `CHANGELOG.md`.
+- Los enlaces del `CHANGELOG.md` apuntan a `github.com/amigosdemito-hue/AdminTools`.
 - Rama por defecto: `main`. La CI de `build.yml` corre en cada push y pull request.
-- En los enlaces del `CHANGELOG.md` hay que sustituir `USUARIO` por el usuario real de GitHub (una
-  vez exista el remoto).
 
 ## 3. Modrinth
 
@@ -65,11 +62,11 @@ git push origin v0.5.1
 
 | Campo | Valor |
 |---|---|
-| Slug | `admintools` (nombre visible: **AdminTools**) |
+| Slug | `admintools-suite` (título visible: **AdminTools**; `admintools` está ocupado por otro autor) |
 | Categoría | `utility` · `management` (secundarias: `admin-tools`) |
 | Carga (loader) | `paper` |
 | Versiones de juego | `26.1` y superiores |
-| Licencia | `MIT` (archivo `LICENSE`) |
+| Licencia | **All Rights Reserved** (`arr` en la API; archivo `LICENSE`: público para consulta, sin permiso de redistribución) |
 | Fuente | URL del repositorio de GitHub |
 | Resumen (≤256) | Suite de administración para servidores Paper 26.1+: sanciones, celdas, rollback, reportes y paneles por rango (helper, moderador, admin) con interfaz de inventario, diálogos y formularios de Bedrock. |
 | Dependencias | Ninguna obligatoria. Opcionales: LuckPerms, CoreProtect, PlaceholderAPI, Floodgate/Geyser, Vault. |

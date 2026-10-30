@@ -1,21 +1,24 @@
-MIT License
-
+AdminTools — Todos los derechos reservados
 Copyright (c) 2026 David Garcia
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Este repositorio es público únicamente para visibilidad y consulta.
+No es un proyecto de código abierto: no se concede ninguna licencia pública.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Sin permiso previo y por escrito del autor, no se permite:
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+  - usar, copiar, distribuir o publicar este software o sus partes;
+  - modificarlo, fusionarlo con otros proyectos o publicar versiones derivadas;
+  - incorporarlo a otros plugins, distribuciones o servicios, gratuitos o de pago;
+  - revenderlo, monetizarlo con él o usarlo para prestar servicios a terceros.
+
+Se permite únicamente leer el código y compilarlo para uso propio en un servidor
+propio de Minecraft, sin redistribuir el binario ni el código.
+
+El plugin se distribuye tal cual, sin garantía de ningún tipo, y el autor no es
+responsable de daños derivados de su uso. Las pruebas de servidores propias y los
+cambios en su configuración son responsabilidad de quien administra el servidor.
+
+Este software no está afiliado a Mojang Studios ni a Microsoft, y tampoco a la
+Plataforma de Modrinth donde se publica su binario.
+
+En Modrinth, este proyecto se publica con la licencia «All Rights Reserved».

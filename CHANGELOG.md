@@ -84,8 +84,8 @@ y el proyecto se versiona con [SemVer](https://semver.org/lang/es/).
 
 ---
 
-[0.5.1]: https://github.com/USUARIO/AdminTools/compare/v0.5.0...v0.5.1
-[0.5.0]: https://github.com/USUARIO/AdminTools/compare/v0.4.5...v0.5.0
-[0.4.5]: https://github.com/USUARIO/AdminTools/compare/v0.4.0...v0.4.5
-[0.4.0]: https://github.com/USUARIO/AdminTools/compare/v0.3.3...v0.4.0
-[0.3.3]: https://github.com/USUARIO/AdminTools/releases/tag/v0.3.3
+[0.5.1]: https://github.com/amigosdemito-hue/AdminTools/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/amigosdemito-hue/AdminTools/compare/v0.4.5...v0.5.0
+[0.4.5]: https://github.com/amigosdemito-hue/AdminTools/compare/v0.4.0...v0.4.5
+[0.4.0]: https://github.com/amigosdemito-hue/AdminTools/compare/v0.3.3...v0.4.0
+[0.3.3]: https://github.com/amigosdemito-hue/AdminTools/releases/tag/v0.3.3
