@@ -57,7 +57,8 @@ public final class ConnectionListener implements Listener {
                             "reason", com.admintools.util.Text.safe(sanction.reason()),
                             "duration", sanction.permanent() ? plugin.getMessages().raw("generic.permanent")
                                     : com.admintools.util.TimeUtil.remaining(sanction.expiresAt()),
-                            "id", sanction.id()));
+                            "id", sanction.id(), "type", sanction.type().display(),
+                            "server", plugin.getServerName()));
             plugin.getAuditService().log((String) null, "CONSOLE", "login.blocked", name,
                     "Sanción #" + sanction.id());
             return;
@@ -97,6 +98,9 @@ public final class ConnectionListener implements Listener {
         Player player = event.getPlayer();
         String ip = player.getAddress() == null ? null : player.getAddress().getAddress().getHostAddress();
         plugin.getPlayerService().onJoin(player.getUniqueId(), player.getName(), ip);
+        // Si el servidor se cayó con una sesión de espectador viva, se devuelve aquí
+        // el modo de juego antes de que el jugador pueda seguir en espectador.
+        plugin.getSpectate().onJoin(player);
         plugin.getStaffState().onJoin(player);
         // En vanish nadie debe ver que entró al servidor.
         if (plugin.getStaffState().vanished(player.getUniqueId())) {
@@ -128,6 +132,9 @@ public final class ConnectionListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        // El espectador se cierra antes de tocar el modo de juego: así el modo staff
+        // devuelve el suyo propio y no se pisan las dos restauraciones.
+        plugin.getSpectate().onQuit(player);
         // Si estaba en modo staff, se devuelve el inventario ANTES de guardar la copia de
         // salida: este listener corre antes que el del modo staff y, sin esto, la copia
         // "Salida del servidor" (la más reciente, la que usa /restore) contendría la

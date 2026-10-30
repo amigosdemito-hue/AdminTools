@@ -22,6 +22,7 @@ import com.admintools.listener.ChatListener;
 import com.admintools.listener.ConnectionListener;
 import com.admintools.listener.JailListener;
 import com.admintools.listener.RollbackListener;
+import com.admintools.listener.StaffCommandListener;
 import com.admintools.listener.StaffListener;
 import com.admintools.listener.StaffModeListener;
 import com.admintools.service.ActionLimiter;
@@ -39,12 +40,16 @@ import com.admintools.service.PlayerService;
 import com.admintools.service.ReportService;
 import com.admintools.service.RestartService;
 import com.admintools.service.RetentionService;
+import com.admintools.service.SanctionAnnounceService;
 import com.admintools.service.SanctionService;
 import com.admintools.service.SnapshotService;
+import com.admintools.service.SpectateService;
+import com.admintools.service.StaffLogService;
 import com.admintools.service.StaffModeService;
 import com.admintools.service.StaffStateService;
 import com.admintools.service.WatchdogService;
 import com.admintools.storage.Database;
+import com.admintools.util.ConsoleBanner;
 import com.admintools.util.SpectatorOpen;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
@@ -75,6 +80,9 @@ public final class AdminToolsPlugin extends JavaPlugin {
     private ChatService chatService;
     private StaffStateService staffState;
     private StaffModeService staffMode;
+    private SpectateService spectate;
+    private StaffLogService staffLog;
+    private SanctionAnnounceService sanctionAnnounce;
     private FollowService followService;
     private SnapshotService snapshotService;
     private JailService jailService;
@@ -83,6 +91,7 @@ public final class AdminToolsPlugin extends JavaPlugin {
     private RollbackListener rollbackListener;
     private ChatInputService chatInput;
     private PanelService panels;
+    private CommandRegistry commandRegistry;
     private WatchdogService watchdogService;
     private MaintenanceService maintenanceService;
     private RestartService restartService;
@@ -106,10 +115,12 @@ public final class AdminToolsPlugin extends JavaPlugin {
         serverName = settings.serverName();
 
         database = new Database(this, settings);
+        getLogger().info("Conectando a " + database.describeTarget());
         String error = database.test();
         if (error != null) {
             getLogger().severe("No pude conectar a la base de datos: " + error);
-            getLogger().severe("El plugin se desactiva para no trabajar sin datos.");
+            getLogger().severe("El plugin se desactiva para no trabajar sin datos. "
+                    + "Si solo estás probando, pon storage.type: sqlite en config.yml.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -130,6 +141,9 @@ public final class AdminToolsPlugin extends JavaPlugin {
         // tiene que aparecer en la celda desde el primer segundo.
         jailService.load();
         staffMode = new StaffModeService(this);
+        spectate = new SpectateService(this);
+        staffLog = new StaffLogService(this);
+        sanctionAnnounce = new SanctionAnnounceService(this);
         followService = new FollowService(this);
         watchdogService = new WatchdogService(this);
         maintenanceService = new MaintenanceService(this);
@@ -144,10 +158,15 @@ public final class AdminToolsPlugin extends JavaPlugin {
         // Integraciones opcionales
         integrations = new IntegrationManager(this);
         integrations.setup();
+        // El registro necesita el webhook ya resuelto para saber si puede enviar.
+        staffLog.start();
 
         // Comandos
         rollbackGui = new RollbackGui(this);
         CommandRegistry registry = new CommandRegistry(this);
+        // El registro se guarda para que quien intercepte comandos ajenos pueda
+        // saber si el que se escribió ya lo anota el propio plugin (y no duplicarlo).
+        commandRegistry = registry;
         new RootCommand(this, registry);
         new SanctionCommands(this, registry);
         new StaffCommands(this, registry);
@@ -179,6 +198,8 @@ public final class AdminToolsPlugin extends JavaPlugin {
         pluginManager.registerEvents(new ChatListener(this), this);
         pluginManager.registerEvents(new StaffListener(this), this);
         pluginManager.registerEvents(new StaffModeListener(this), this);
+        // Comandos de otros plugins (/give, /gamemode, EssentialsX...) usados por staff.
+        pluginManager.registerEvents(new StaffCommandListener(this), this);
         pluginManager.registerEvents(chatInput, this);
         pluginManager.registerEvents(panels.inventory(), this);
 
@@ -188,6 +209,7 @@ public final class AdminToolsPlugin extends JavaPlugin {
         Bukkit.getScheduler().runTaskTimer(this, sanctionService::expireDue, 600L, 600L);
         followService.start();
         Bukkit.getScheduler().runTaskTimer(this, jailService::tick, 20L, 20L);
+        Bukkit.getScheduler().runTaskTimer(this, spectate::tick, 20L, 20L);
         rollbackListener.start();
         watchdogService.start();
         restartService.start();
@@ -198,9 +220,6 @@ public final class AdminToolsPlugin extends JavaPlugin {
             new Metrics(this, BSTATS_ID);
         }
 
-        getLogger().info("AdminTools habilitado en " + (System.currentTimeMillis() - started) + " ms · "
-                + (settings.mysql() ? "MySQL" : "SQLite") + " · idioma " + settings.language() + " · "
-                + (maintenanceService.enabled() ? "EN MANTENIMIENTO" : "operativo"));
         // Línea de soporte: deja por escrito qué modo de vanish quedó activo.
         getLogger().info("Vanish: contenedores silenciosos="
                 + (settings.vanishSilentContainers() ? "ON" : "OFF")
@@ -210,6 +229,18 @@ public final class AdminToolsPlugin extends JavaPlugin {
                 + " · verse entre invisibles="
                 + (settings.vanishSeeRequiresVanish() ? "SÓLO EN VANISH" : "CON PERMISO")
                 + " · apertura sin animación=" + (SpectatorOpen.available() ? "OK" : "NO DISPONIBLE"));
+        getLogger().info("Espectador: " + (settings.staffSpectateEnabled()
+                ? com.admintools.util.TimeUtil.format(settings.staffSpectateMillis()) + " activo · "
+                        + (settings.staffSpectateCooldownMillis() <= 0L ? "sin recarga"
+                                : com.admintools.util.TimeUtil.format(settings.staffSpectateCooldownMillis()) + " de recarga")
+                : "OFF")
+                + " · registro de staff a Discord=" + (staffLog.usable() ? "ON" : "OFF"));
+        getLogger().info("Anuncios de sanciones: " + sanctionAnnounce.status());
+
+        // Letrero de arranque: un solo bloque con versión, datos, módulos e
+        // integraciones. Va al final (y sustituye a la línea de "habilitado en
+        // N ms") para que quede como cierre del arranque, no escondido entre la carga.
+        ConsoleBanner.print(this, registry, System.currentTimeMillis() - started);
     }
 
     /**
@@ -239,6 +270,13 @@ public final class AdminToolsPlugin extends JavaPlugin {
         }
         if (retentionService != null) {
             retentionService.stop();
+        }
+        // Antes que el modo staff: devuelve el modo de juego y libera la sesión.
+        if (spectate != null) {
+            spectate.shutdown();
+        }
+        if (staffLog != null) {
+            staffLog.stop();
         }
         if (integrations != null) {
             integrations.shutdown();
@@ -276,6 +314,8 @@ public final class AdminToolsPlugin extends JavaPlugin {
         sanctionService.refreshCache();
         reportService.clearCache();
         rollbackListener.start();
+        staffLog.start();
+        sanctionAnnounce.reload();
         integrations.luckPerms().forgetAll();
         integrations.anticheat().refresh();
     }
@@ -298,6 +338,11 @@ public final class AdminToolsPlugin extends JavaPlugin {
 
     public AuditService getAuditService() {
         return auditService;
+    }
+
+    /** Registro central de comandos (nombres y alias del plugin). */
+    public CommandRegistry getCommandRegistry() {
+        return commandRegistry;
     }
 
     public PlayerService getPlayerService() {
@@ -326,6 +371,21 @@ public final class AdminToolsPlugin extends JavaPlugin {
 
     public StaffModeService getStaffMode() {
         return staffMode;
+    }
+
+    /** Espectador de vigilancia (herramienta del modo staff). */
+    public SpectateService getSpectate() {
+        return spectate;
+    }
+
+    /** Registro de acciones del staff hacia Discord. */
+    public StaffLogService getStaffLog() {
+        return staffLog;
+    }
+
+    /** Anuncios públicos de sanciones (y su copia al canal de staff). */
+    public SanctionAnnounceService getSanctionAnnounce() {
+        return sanctionAnnounce;
     }
 
     public FollowService getFollowService() {

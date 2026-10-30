@@ -63,13 +63,23 @@ public final class SanctionService {
     private final Database db;
     private final String table;
     /** uuid -> sanciones activas de ese jugador */
-    private final Map<UUID, List<Sanction>> activeByTarget = new ConcurrentHashMap<>();
+    private volatile Map<UUID, List<Sanction>> activeByTarget = new ConcurrentHashMap<>();
     /** nombre en minúsculas -> sanciones activas creadas sobre ese nombre (jugador nunca visto) */
-    private final Map<String, List<Sanction>> activeByName = new ConcurrentHashMap<>();
+    private volatile Map<String, List<Sanction>> activeByName = new ConcurrentHashMap<>();
     /** ip -> ip-ban activo */
-    private final Map<String, Sanction> activeIpBans = new ConcurrentHashMap<>();
+    private volatile Map<String, Sanction> activeIpBans = new ConcurrentHashMap<>();
     /** ip -> ip-mute activo */
-    private final Map<String, Sanction> activeIpMutes = new ConcurrentHashMap<>();
+    private volatile Map<String, Sanction> activeIpMutes = new ConcurrentHashMap<>();
+
+    /** Protege el intercambio de la caché y el registro de cambios en vuelo. */
+    private final Object cacheLock = new Object();
+    /** ¿Hay una lectura de la base en curso? */
+    private boolean refreshInFlight;
+    /** Se pidió otro refresco mientras uno estaba en curso. */
+    private boolean refreshQueued;
+    /** Sanciones puestas o quitadas mientras se leía la base. */
+    private final List<Sanction> pendingPuts = new ArrayList<>();
+    private final List<Long> pendingDrops = new ArrayList<>();
 
     public SanctionService(AdminToolsPlugin plugin) {
         this.plugin = plugin;
@@ -115,58 +125,111 @@ public final class SanctionService {
 
     /** Relee de disco todas las sanciones activas (llamado al arrancar y cada minuto). */
     public void refreshCache() {
-        db.async(() -> {
-            List<Sanction> active = db.query("SELECT * FROM " + table + " WHERE active = 1", this::map);
-            Map<UUID, List<Sanction>> byTarget = new ConcurrentHashMap<>();
-            Map<String, List<Sanction>> byName = new ConcurrentHashMap<>();
-            Map<String, Sanction> ipBans = new ConcurrentHashMap<>();
-            Map<String, Sanction> ipMutes = new ConcurrentHashMap<>();
-            for (Sanction sanction : active) {
-                // Las expulsiones y lo ya vencido no cuentan como restricción activa.
-                if (sanction.expired() || sanction.type() == PunishmentType.KICK) {
-                    continue;
-                }
-                byTarget.computeIfAbsent(sanction.targetUuid(), key -> Collections.synchronizedList(new ArrayList<>()))
-                        .add(sanction);
-                if (sanction.targetName() != null) {
-                    byName.computeIfAbsent(sanction.targetName().toLowerCase(Locale.ROOT),
-                                    key -> Collections.synchronizedList(new ArrayList<>()))
-                            .add(sanction);
-                }
-                if (sanction.type() == PunishmentType.IP_BAN && sanction.ip() != null) {
-                    ipBans.putIfAbsent(sanction.ip(), sanction);
-                }
-                if (sanction.type() == PunishmentType.IP_MUTE && sanction.ip() != null) {
-                    ipMutes.putIfAbsent(sanction.ip(), sanction);
-                }
+        synchronized (cacheLock) {
+            if (refreshInFlight) {
+                // Ya hay una lectura en curso: se encadena otra al terminar en vez de
+                // descartarla, para que el último estado acabe publicado igualmente.
+                refreshQueued = true;
+                return;
             }
-            activeByTarget.clear();
-            activeByTarget.putAll(byTarget);
-            activeByName.clear();
-            activeByName.putAll(byName);
-            activeIpBans.clear();
-            activeIpBans.putAll(ipBans);
-            activeIpMutes.clear();
-            activeIpMutes.putAll(ipMutes);
-        });
+            refreshInFlight = true;
+        }
+        db.async(this::readCache);
     }
 
-    private void cachePut(Sanction sanction) {
-        activeByTarget.computeIfAbsent(sanction.targetUuid(),
-                        key -> Collections.synchronizedList(new ArrayList<>()))
-                .add(sanction);
-        if (sanction.targetName() != null) {
-            activeByName.computeIfAbsent(sanction.targetName().toLowerCase(Locale.ROOT),
-                            key -> Collections.synchronizedList(new ArrayList<>()))
-                    .add(sanction);
+    /**
+     * Lee las sanciones activas y publica los cuatro índices de golpe.
+     *
+     * <p>Antes se vaciaban y rellenaban los mapas en vivo: un {@code /ban} aplicado
+     * justo entre la lectura y el relleno se quedaba fuera de la caché hasta el
+     * siguiente refresco (hasta 20 s sin ban efectivo). Ahora lo que se sanciona o se
+     * levanta durante la lectura se reaplica sobre el resultado antes de publicarlo.</p>
+     */
+    private void readCache() {
+        List<Sanction> active;
+        try {
+            active = db.query("SELECT * FROM " + table + " WHERE active = 1", this::map);
+        } catch (RuntimeException ex) {
+            // Si la lectura falla se conserva la caché anterior y se libera el turno:
+            // dejar el refresco marcado como "en curso" congelaría la caché para siempre.
+            synchronized (cacheLock) {
+                refreshInFlight = false;
+                refreshQueued = false;
+            }
+            plugin.getLogger().warning("No pude refrescar la caché de sanciones: " + ex.getMessage());
+            return;
+        }
+        Map<UUID, List<Sanction>> byTarget = new ConcurrentHashMap<>();
+        Map<String, List<Sanction>> byName = new ConcurrentHashMap<>();
+        Map<String, Sanction> ipBans = new ConcurrentHashMap<>();
+        Map<String, Sanction> ipMutes = new ConcurrentHashMap<>();
+        for (Sanction sanction : active) {
+            // Las expulsiones y lo ya vencido no cuentan como restricción activa.
+            if (sanction.expired() || sanction.type() == PunishmentType.KICK) {
+                continue;
+            }
+            put(byTarget, byName, ipBans, ipMutes, sanction);
+        }
+        boolean again;
+        synchronized (cacheLock) {
+            for (Sanction sanction : pendingPuts) {
+                put(byTarget, byName, ipBans, ipMutes, sanction);
+            }
+            for (Long id : pendingDrops) {
+                dropById(byTarget, byName, ipBans, ipMutes, id);
+            }
+            pendingPuts.clear();
+            pendingDrops.clear();
+            activeByTarget = byTarget;
+            activeByName = byName;
+            activeIpBans = ipBans;
+            activeIpMutes = ipMutes;
+            refreshInFlight = false;
+            again = refreshQueued;
+            refreshQueued = false;
+        }
+        if (again) {
+            refreshCache();
+        }
+    }
+
+    /** Añade una sanción a los índices indicados, sin duplicarla si ya estaba. */
+    private static void put(Map<UUID, List<Sanction>> byTarget, Map<String, List<Sanction>> byName,
+                            Map<String, Sanction> ipBans, Map<String, Sanction> ipMutes, Sanction sanction) {
+        List<Sanction> byUuid = byTarget.computeIfAbsent(sanction.targetUuid(),
+                key -> Collections.synchronizedList(new ArrayList<>()));
+        synchronized (byUuid) {
+            for (Sanction existing : byUuid) {
+                if (existing.id() == sanction.id()) {
+                    return; // repetirla contaría doble en advertencias y listados
+                }
+            }
+            byUuid.add(sanction);
+        }
+        String name = sanction.targetName();
+        if (name != null && !name.isBlank()) {
+            List<Sanction> byNameList = byName.computeIfAbsent(name.toLowerCase(Locale.ROOT),
+                    key -> Collections.synchronizedList(new ArrayList<>()));
+            synchronized (byNameList) {
+                byNameList.add(sanction);
+            }
         }
         // La más reciente manda: con putIfAbsent, una entrada caducada de la misma IP
         // impediría que el ban nuevo llegara a la caché.
         if (sanction.type() == PunishmentType.IP_BAN && sanction.ip() != null) {
-            activeIpBans.put(sanction.ip(), sanction);
+            ipBans.put(sanction.ip(), sanction);
         }
         if (sanction.type() == PunishmentType.IP_MUTE && sanction.ip() != null) {
-            activeIpMutes.put(sanction.ip(), sanction);
+            ipMutes.put(sanction.ip(), sanction);
+        }
+    }
+
+    private void cachePut(Sanction sanction) {
+        synchronized (cacheLock) {
+            if (refreshInFlight) {
+                pendingPuts.add(sanction);
+            }
+            put(activeByTarget, activeByName, activeIpBans, activeIpMutes, sanction);
         }
     }
 
@@ -179,29 +242,35 @@ public final class SanctionService {
      * silenciado podría volver a escribir o un ban dejaría de verse.</p>
      */
     private void cacheDrop(Sanction sanction) {
-        activeIpBans.entrySet().removeIf(entry -> entry.getValue().id() == sanction.id());
-        activeIpMutes.entrySet().removeIf(entry -> entry.getValue().id() == sanction.id());
-        List<Sanction> byTarget = activeByTarget.get(sanction.targetUuid());
-        if (byTarget != null) {
-            synchronized (byTarget) {
-                byTarget.removeIf(entry -> entry.id() == sanction.id());
-                if (byTarget.isEmpty()) {
-                    activeByTarget.remove(sanction.targetUuid(), byTarget);
-                }
+        synchronized (cacheLock) {
+            if (refreshInFlight) {
+                pendingDrops.add(sanction.id());
+            }
+            dropById(activeByTarget, activeByName, activeIpBans, activeIpMutes, sanction.id());
+        }
+    }
+
+    /** Quita de los índices la sanción con ese id (por UUID, por nombre y por IP). */
+    private static void dropById(Map<UUID, List<Sanction>> byTarget, Map<String, List<Sanction>> byName,
+                                 Map<String, Sanction> ipBans, Map<String, Sanction> ipMutes, long id) {
+        ipBans.entrySet().removeIf(entry -> entry.getValue().id() == id);
+        ipMutes.entrySet().removeIf(entry -> entry.getValue().id() == id);
+        for (Map.Entry<UUID, List<Sanction>> entry : byTarget.entrySet()) {
+            List<Sanction> list = entry.getValue();
+            synchronized (list) {
+                list.removeIf(existing -> existing.id() == id);
+            }
+            if (list.isEmpty()) {
+                byTarget.remove(entry.getKey(), list);
             }
         }
-        String name = sanction.targetName();
-        if (name == null || name.isBlank()) {
-            return;
-        }
-        String key = name.toLowerCase(Locale.ROOT);
-        List<Sanction> byName = activeByName.get(key);
-        if (byName != null) {
-            synchronized (byName) {
-                byName.removeIf(entry -> entry.id() == sanction.id());
-                if (byName.isEmpty()) {
-                    activeByName.remove(key, byName);
-                }
+        for (Map.Entry<String, List<Sanction>> entry : byName.entrySet()) {
+            List<Sanction> list = entry.getValue();
+            synchronized (list) {
+                list.removeIf(existing -> existing.id() == id);
+            }
+            if (list.isEmpty()) {
+                byName.remove(entry.getKey(), list);
             }
         }
     }
@@ -260,6 +329,7 @@ public final class SanctionService {
             }
             liftOne(sanction, actor, reason);
             cacheDrop(sanction);
+            plugin.getSanctionAnnounce().sanctionEnded(sanction);
             count++;
         }
         if (count > 0) {
@@ -402,6 +472,7 @@ public final class SanctionService {
                 request.staffName(), "sanction." + request.type().name().toLowerCase(Locale.ROOT),
                 request.targetName(), "#" + id + " " + request.reason());
         plugin.getIntegrations().discordSanction(sanction);
+        plugin.getSanctionAnnounce().sanction(sanction);
 
         if (request.type() == PunishmentType.WARN) {
             plugin.getSanctionService().checkAutoEscalation(request.targetUuid(), request.targetName());
@@ -444,10 +515,12 @@ public final class SanctionService {
         }
         switch (sanction.type()) {
             case KICK -> player.kick(plugin.getMessages().get("sanctions.target-kicked",
-                    "reason", Text.safe(sanction.reason()), "staff", sanction.staffName()));
+                    "reason", Text.safe(sanction.reason()), "staff", sanction.staffName(),
+                    "server", plugin.getServerName()));
             case BAN, IP_BAN -> player.kick(plugin.getMessages().get("sanctions.target-banned",
                     "reason", Text.safe(sanction.reason()), "duration", durationText(sanction),
-                    "id", sanction.id()));
+                    "id", sanction.id(), "type", sanction.type().display(),
+                    "server", plugin.getServerName()));
             case MUTE, IP_MUTE, SHADOW_MUTE -> player.sendMessage(plugin.getMessages().prefixed("sanctions.target-muted",
                     "reason", Text.safe(sanction.reason()), "duration", durationText(sanction),
                     "id", sanction.id()));
@@ -534,6 +607,8 @@ public final class SanctionService {
             }
             liftOne(sanction, actor, reason);
             cacheDrop(sanction);
+            // Levantarla antes de tiempo también es el fin de la sanción: se anuncia.
+            plugin.getSanctionAnnounce().sanctionEnded(sanction);
             count++;
         }
         refreshCache();
@@ -786,6 +861,9 @@ public final class SanctionService {
     /** Aviso de las sanciones que acaban de expirar (siempre en el hilo del servidor). */
     private void notifyExpired(List<Sanction> expired) {
         for (Sanction sanction : expired) {
+            // Anuncio público del fin: sólo llega aquí la pasada que de verdad cerró la
+            // sanción, así que no se repite tras un reinicio ni con dos pasadas solapadas.
+            plugin.getSanctionAnnounce().sanctionEnded(sanction);
             Component message = plugin.getMessages().get("sanctions.expired",
                     "id", sanction.id(), "player", sanction.targetName(), "type", sanction.type().display());
             Bukkit.getConsoleSender().sendMessage(message);

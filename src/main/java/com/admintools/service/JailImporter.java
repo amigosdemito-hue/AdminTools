@@ -66,6 +66,10 @@ public final class JailImporter {
 
     /** Ejecuta la importación desde una carpeta o archivo concreto. */
     public Report importFrom(File source, boolean dryRun) {
+        // Sin esto, las celdas "simuladas" de un --dry anterior seguían contando como
+        // existentes en la importación real de la misma sesión: los presos de esas
+        // celdas se daban por importados cuando en realidad no se creó ninguna.
+        simulatedJails.clear();
         List<String> notes = new ArrayList<>();
         int jails = 0;
         int prisoners = 0;

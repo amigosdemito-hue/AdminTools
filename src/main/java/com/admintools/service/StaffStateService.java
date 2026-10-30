@@ -98,7 +98,7 @@ public final class StaffStateService {
         UUID uuid = player.getUniqueId();
         if (vanished.remove(uuid)) {
             saveVanish();
-            resyncVanish();
+            resyncVanish(player);
             clearGlow(player);
             fakeJoin(player);
             plugin.getMessages().send(player, "staff.vanish-off");
@@ -109,7 +109,7 @@ public final class StaffStateService {
         // Los que entren después tampoco deben verlo, sin depender del orden de los eventos.
         player.setVisibleByDefault(false);
         hiddenByDefault.add(uuid);
-        resyncVanish();
+        resyncVanish(player);
         reapplyGlow(player);
         fakeQuit(player);
         plugin.getMessages().send(player, "staff.vanish-on");
@@ -144,37 +144,46 @@ public final class StaffStateService {
     }
 
     /**
-     * Recalcula quién ve a quién entre los conectados.
+     * Recalcula quién ve a quién cuando cambia un jugador.
      *
-     * <p>Se hace de una pasada completa en vez de sólo el que cambió porque la regla
-     * depende de los dos lados: al activar el vanish hay que ver a los demás invisibles, y
-     * al desactivarlo hay que dejar de verlos. Así no queda ningún par a medias.</p>
+     * <p>Antes se recorría la matriz completa en cada entrada o cambio de vanish
+     * (n² ocultar/mostrar: con 200 conectados, unas 40 000 llamadas por conexión). La
+     * regla depende de los dos lados del par, así que basta con reconciliar los pares
+     * en los que participa quien cambia: como observador (empieza o deja de ver a los
+     * invisibles) y como objetivo (los demás empiezan o dejan de verlo).</p>
      */
-    private void resyncVanish() {
-        for (Player target : Bukkit.getOnlinePlayers()) {
-            UUID id = target.getUniqueId();
-            boolean hidden = vanished(id);
-            // Los que entren a partir de ahora tampoco lo verán. Sólo se toca la
-            // visibilidad por defecto de quien hemos ocultado nosotros: ponerla en true al
-            // pasar por aquí desharía la de otro plugin que oculte a alguien por su cuenta.
-            if (hidden) {
-                target.setVisibleByDefault(false);
-                hiddenByDefault.add(id);
-            } else if (hiddenByDefault.remove(id)) {
-                target.setVisibleByDefault(true);
+    private void resyncVanish(Player changed) {
+        UUID id = changed.getUniqueId();
+        boolean hidden = vanished(id);
+        // Los que entren a partir de ahora tampoco lo verán. Sólo se toca la
+        // visibilidad por defecto de quien hemos ocultado nosotros: ponerla en true al
+        // pasar por aquí desharía la de otro plugin que oculte a alguien por su cuenta.
+        if (hidden) {
+            changed.setVisibleByDefault(false);
+            hiddenByDefault.add(id);
+        } else if (hiddenByDefault.remove(id)) {
+            changed.setVisibleByDefault(true);
+        }
+        for (Player other : Bukkit.getOnlinePlayers()) {
+            if (other.equals(changed)) {
+                continue;
             }
-            for (Player viewer : Bukkit.getOnlinePlayers()) {
-                if (viewer.equals(target)) {
-                    continue;
-                }
-                if (hidden && !seesVanished(viewer)) {
-                    viewer.hidePlayer(plugin, target);
-                } else {
-                    viewer.showPlayer(plugin, target);
-                }
-            }
+            applyPair(other, changed);
+            applyPair(changed, other);
         }
         paintGlowSafely();
+    }
+
+    /** Ajusta un par: a un invisible sólo lo ven los demás invisibles. */
+    private void applyPair(Player viewer, Player target) {
+        if (viewer.equals(target)) {
+            return;
+        }
+        if (vanished(target.getUniqueId()) && !seesVanished(viewer)) {
+            viewer.hidePlayer(plugin, target);
+        } else {
+            viewer.showPlayer(plugin, target);
+        }
     }
 
     /**
@@ -187,7 +196,7 @@ public final class StaffStateService {
      * plugin abriría los contenedores en silencio.</p>
      */
     public void onJoin(Player joiner) {
-        resyncVanish();
+        resyncVanish(joiner);
         reapplyGlow(joiner);
         if (vanished(joiner.getUniqueId())) {
             plugin.getMessages().send(joiner, "staff.vanish-restored");
@@ -274,15 +283,6 @@ public final class StaffStateService {
     }
 
     /**
-     * Reparte el brillo y su color.
-     *
-     * <p>El color se pone en un equipo del marcador porque el efecto GLOWING siempre
-     * brilla en blanco. Se escribe en el marcador de <b>cada observador</b> en vez de en el
-     * principal: muchos servidores dan a cada jugador un marcador propio (TAB, HUDs) y en
-     * ese caso el principal no pinta nada, y de paso el color sólo lo ve quien debe ver a
-     * los invisibles.</p>
-     */
-    /**
      * Envuelve el pintado para que un marcador ajeno no pueda tumbar el vanish.
      *
      * <p>El brillo es cosmético; la invisibilidad no. Si pintar falla, se avisa una vez y se
@@ -299,6 +299,15 @@ public final class StaffStateService {
         }
     }
 
+    /**
+     * Reparte el brillo y su color.
+     *
+     * <p>El color se pone en un equipo del marcador porque el efecto GLOWING siempre
+     * brilla en blanco. Se escribe en el marcador de <b>cada observador</b> en vez de en el
+     * principal: muchos servidores dan a cada jugador un marcador propio (TAB, HUDs) y en
+     * ese caso el principal no pinta nada, y de paso el color sólo lo ve quien debe ver a
+     * los invisibles.</p>
+     */
     private void paintGlow() {
         boolean enabled = plugin.getSettings().vanishGlow();
         for (Player viewer : Bukkit.getOnlinePlayers()) {

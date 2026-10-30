@@ -3,6 +3,7 @@ package com.admintools.integration;
 import com.admintools.AdminToolsPlugin;
 import com.admintools.model.Report;
 import com.admintools.model.Sanction;
+import com.admintools.util.Heads;
 import com.admintools.util.TimeUtil;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
@@ -163,16 +164,48 @@ public final class IntegrationManager {
         discord.send("Sanción levantada · " + sanction.type().display(), null, 0x2ECC71, fields);
     }
 
+    /**
+     * Reporte al canal privado del staff.
+     *
+     * <p>Va firmado por quien reporta (con la cabeza de su skin) y muestra la cabeza del
+     * reportado como miniatura, para que el staff reconozca a los dos de un vistazo. Con
+     * {@code reports.anonymous} el reportero queda oculto, igual que en la cola.</p>
+     *
+     * <p>No depende de {@code discord.enabled}: el canal de reportes puede estar
+     * configurado por su cuenta aunque las alertas generales estén apagadas.</p>
+     */
     public void discordReport(Report report) {
-        if (!discord.enabled() || !plugin.getSettings().discordEvent("report")) {
+        if (!plugin.getSettings().discordEvent("report")) {
             return;
         }
-        List<DiscordWebhook.Field> fields = List.of(
-                new DiscordWebhook.Field("Reporta", report.reporterName(), true),
-                new DiscordWebhook.Field("Reportado", report.targetName(), true),
-                new DiscordWebhook.Field("Motivo", report.reason(), false),
-                new DiscordWebhook.Field("ID", "#" + report.id(), true));
-        discord.send(plugin.getMessages().raw("discord.report-title") + " · #" + report.id(), null, COLOR_REPORT, fields);
+        String url = plugin.getSettings().reportDiscordWebhook();
+        if (!DiscordWebhook.validUrl(url)) {
+            return;
+        }
+        boolean anonymous = plugin.getSettings().reportAnonymous();
+        String headTemplate = plugin.getSettings().announcementsHeadUrl();
+        String reporter = anonymous ? plain("announce.report-anonymous") : report.reporterName();
+        String reporterHead = anonymous ? null : Heads.url(headTemplate, report.reporterUuid(), report.reporterName());
+
+        List<DiscordWebhook.Field> fields = new ArrayList<>();
+        fields.add(new DiscordWebhook.Field(plain("announce.field-reported"), report.targetName(), true));
+        fields.add(new DiscordWebhook.Field(plain("announce.field-report-id"), "#" + report.id(), true));
+        fields.add(new DiscordWebhook.Field(plain("announce.field-reason"), report.reason(), false));
+        fields.add(new DiscordWebhook.Field(plain("announce.field-date"),
+                "<t:" + (report.createdAt() / 1000L) + ":f>", true));
+        fields.add(new DiscordWebhook.Field(plain("announce.field-server"),
+                report.origin() == null ? "-" : report.origin(), true));
+
+        DiscordWebhook.Embed embed = new DiscordWebhook.Embed(plain("announce.report-title"), null, COLOR_REPORT,
+                Heads.url(headTemplate, report.targetUuid(), report.targetName()),
+                reporter, reporterHead,
+                plain("announce.report-footer") + " · " + plugin.getSettings().serverName(), fields);
+        discord.sendTo(url, plugin.getSettings().discordUsername(), plugin.getSettings().discordAvatar(), embed);
+    }
+
+    /** Texto de un mensaje ya en plano (Discord no entiende MiniMessage). */
+    private String plain(String key) {
+        return PlainTextComponentSerializer.plainText().serialize(plugin.getMessages().get(key));
     }
 
     public void discordWatchdog(String metric, String value, String state, String hint) {

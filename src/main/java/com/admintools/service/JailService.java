@@ -231,6 +231,7 @@ public final class JailService {
 
         plugin.getAuditService().log(staffUuid == null ? null : staffUuid.toString(), staffName,
                 "jail.apply", target.getName(), jail.name() + " · " + reason);
+        plugin.getSanctionAnnounce().jail(sentence);
         if (plugin.getSettings().jailNotifyStaff()) {
             plugin.getStaffState().sendToStaff(plugin.getMessages().get("jail.applied",
                     "player", target.getName(), "jail", jail.name(), "staff", staffName,
@@ -286,6 +287,8 @@ public final class JailService {
         }
         plugin.getAuditService().log((String) null, releasedBy, "jail.release", sentence.targetName(),
                 sentence.jail() + " · " + reason);
+        // Se anuncia una sola vez: esta rama sólo se alcanza si la condena seguía activa.
+        plugin.getSanctionAnnounce().jailEnded(sentence);
         return true;
     }
 
@@ -597,6 +600,28 @@ public final class JailService {
                     + ": " + ex.getMessage());
             return false;
         }
+        // Se marca la copia como devuelta ANTES de entregarla, y sólo si seguía pendiente.
+        // Al revés (entregar y luego marcar), un fallo de la base al marcar dejaba la
+        // copia pendiente y la siguiente entrada la entregaba otra vez: ítems duplicados.
+        // El "AND returned = 0" hace que sólo una ejecución pueda reclamarla.
+        int claimed;
+        try {
+            claimed = db.update("UPDATE " + inventoryTable
+                    + " SET returned = 1 WHERE id = ? AND returned = 0", saved.get().id());
+        } catch (RuntimeException ex) {
+            plugin.getLogger().warning("No pude marcar el inventario de " + player.getName()
+                    + " como devuelto; queda pendiente para el próximo intento: " + ex.getMessage());
+            return false;
+        }
+        if (claimed == 0) {
+            // Otra ejecución (o el tick de entrada) se lo llevó antes.
+            pendingInventories.remove(player.getUniqueId());
+            return false;
+        }
+        // Copias viejas del mismo jugador: se descartan para que no se entreguen luego.
+        db.async(() -> db.update("UPDATE " + inventoryTable
+                + " SET returned = 1 WHERE uuid = ? AND returned = 0", player.getUniqueId().toString()));
+
         for (ItemStack stack : player.getInventory().getContents()) {
             if (stack != null && !stack.getType().isAir()) {
                 player.getWorld().dropItemNaturally(player.getLocation(), stack);
@@ -606,10 +631,6 @@ public final class JailService {
         ItemStack[] full = contents.length >= 41 ? contents : java.util.Arrays.copyOf(contents, 41);
         player.getInventory().setContents(full);
         player.updateInventory();
-        // Se marca en el momento (no en segundo plano): si quedara pendiente un
-        // instante, una segunda entrada podría devolver la misma copia otra vez.
-        db.update("UPDATE " + inventoryTable + " SET returned = 1 WHERE uuid = ? AND returned = 0",
-                player.getUniqueId().toString());
         pendingInventories.remove(player.getUniqueId());
         player.sendMessage(plugin.getMessages().prefixed("jail.inventory-returned"));
         return true;

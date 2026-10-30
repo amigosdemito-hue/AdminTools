@@ -1,6 +1,8 @@
 package com.admintools.command;
 
 import com.admintools.AdminToolsPlugin;
+import com.admintools.model.PunishmentType;
+import com.admintools.model.Sanction;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -170,6 +172,19 @@ public abstract class CommandSupport {
 
     private Boolean hasOffline(UUID uuid, String node) {
         return plugin.getIntegrations().luckPerms().hasPermissionOffline(uuid, node);
+    }
+
+    /**
+     * Confirmación al staff que aplicó la sanción.
+     *
+     * <p>Una advertencia o una expulsión no tienen duración: con la misma línea
+     * quedaba un separador suelto ("· -"), así que cada tipo tiene la suya.</p>
+     */
+    protected void confirmApplied(CommandSender sender, Sanction sanction, String display, long duration) {
+        boolean timed = sanction.type() != PunishmentType.WARN && sanction.type() != PunishmentType.KICK;
+        plugin.getMessages().send(sender, timed ? "sanctions.applied" : "sanctions.applied-no-duration",
+                "id", sanction.id(), "player", display, "type", sanction.type().display(),
+                "duration", plugin.getSanctionService().durationText(duration));
     }
 
     protected UUID staffUuid(CommandSender sender) {

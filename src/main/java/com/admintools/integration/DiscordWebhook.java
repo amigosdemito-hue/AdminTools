@@ -20,6 +20,22 @@ public final class DiscordWebhook {
     public record Field(String name, String value, boolean inline) {
     }
 
+    /**
+     * Un embed completo.
+     *
+     * <p>{@code thumbnailUrl} pinta la imagen a la derecha (la cabeza de la skin) y el
+     * bloque de autor permite firmar el mensaje con un nombre y un icono distintos del
+     * resto del embed: es lo que distingue el anuncio público (firmado por el jugador)
+     * de la copia del staff (firmada por quien sancionó).</p>
+     */
+    public record Embed(String title, String description, int color, String thumbnailUrl,
+                        String authorName, String authorIconUrl, String footer, List<Field> fields) {
+
+        public static Embed of(String title, String description, int color, List<Field> fields) {
+            return new Embed(title, description, color, null, null, null, null, fields);
+        }
+    }
+
     private final AdminToolsPlugin plugin;
     private final HttpClient client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(8))
@@ -31,7 +47,24 @@ public final class DiscordWebhook {
 
     public boolean enabled() {
         String url = plugin.getSettings().discordWebhook();
-        return plugin.getSettings().discordEnabled() && url != null && !url.isBlank() && url.startsWith("https://");
+        return plugin.getSettings().discordEnabled() && validUrl(url);
+    }
+
+    /**
+     * ¿Es una URL de webhook usable? (cualquier destino, no sólo el configurado).
+     *
+     * <p>Sólo se acepta {@code https://} para destinos remotos. La excepción es el
+     * bucle local: ahí se permite {@code http://} para poder probar el formato del
+     * embed con un receptor propio antes de apuntar a Discord.</p>
+     */
+    public static boolean validUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        if (url.startsWith("https://")) {
+            return true;
+        }
+        return url.startsWith("http://127.0.0.1") || url.startsWith("http://localhost");
     }
 
     /** Envía un embed simple. */
@@ -39,33 +72,58 @@ public final class DiscordWebhook {
         if (!enabled()) {
             return;
         }
+        sendTo(plugin.getSettings().discordWebhook(), plugin.getSettings().discordUsername(),
+                plugin.getSettings().discordAvatar(), Embed.of(title, description, color, fields));
+    }
+
+    /** Envía un embed a un webhook concreto, con su propio nombre y avatar. */
+    public void sendTo(String webhookUrl, String username, String avatar, Embed embed) {
+        if (!validUrl(webhookUrl) || embed == null) {
+            return;
+        }
+        post(webhookUrl, payload(username, avatar, embed));
+    }
+
+    private String payload(String username, String avatar, Embed embed) {
         StringBuilder json = new StringBuilder();
-        json.append("{\"username\":\"").append(escape(plugin.getSettings().discordUsername())).append("\"");
-        String avatar = plugin.getSettings().discordAvatar();
+        json.append("{\"username\":\"").append(escape(username)).append("\"");
         if (avatar != null && !avatar.isBlank()) {
             json.append(",\"avatar_url\":\"").append(escape(avatar)).append("\"");
         }
-        json.append(",\"embeds\":[{");
-        json.append("\"title\":\"").append(escape(title)).append("\"");
-        if (description != null && !description.isBlank()) {
-            json.append(",\"description\":\"").append(escape(description)).append("\"");
+        // Nunca se permite que un motivo con @everyone mención a medio Discord.
+        json.append(",\"allowed_mentions\":{\"parse\":[\"users\"]}");
+        json.append(",\"embeds\":[{\"title\":\"").append(escape(embed.title())).append("\"");
+        if (embed.description() != null && !embed.description().isBlank()) {
+            json.append(",\"description\":\"").append(escape(embed.description())).append("\"");
         }
-        json.append(",\"color\":").append(color);
+        json.append(",\"color\":").append(embed.color());
         json.append(",\"timestamp\":\"").append(java.time.Instant.now()).append("\"");
-        if (fields != null && !fields.isEmpty()) {
+        if (embed.authorName() != null && !embed.authorName().isBlank()) {
+            json.append(",\"author\":{\"name\":\"").append(escape(embed.authorName())).append("\"");
+            if (embed.authorIconUrl() != null && !embed.authorIconUrl().isBlank()) {
+                json.append(",\"icon_url\":\"").append(escape(embed.authorIconUrl())).append("\"");
+            }
+            json.append("}");
+        }
+        if (embed.thumbnailUrl() != null && !embed.thumbnailUrl().isBlank()) {
+            json.append(",\"thumbnail\":{\"url\":\"").append(escape(embed.thumbnailUrl())).append("\"}");
+        }
+        if (embed.footer() != null && !embed.footer().isBlank()) {
+            json.append(",\"footer\":{\"text\":\"").append(escape(embed.footer())).append("\"}");
+        }
+        if (embed.fields() != null && !embed.fields().isEmpty()) {
             List<String> rendered = new ArrayList<>();
-            for (Field field : fields) {
+            for (Field field : embed.fields()) {
                 rendered.add("{\"name\":\"" + escape(field.name()) + "\",\"value\":\"" + escape(field.value())
                         + "\",\"inline\":" + field.inline() + "}");
             }
             json.append(",\"fields\":[").append(String.join(",", rendered)).append("]");
         }
         json.append("}]}");
-        post(json.toString());
+        return json.toString();
     }
 
-    private void post(String payload) {
-        String url = plugin.getSettings().discordWebhook();
+    private void post(String url, String payload) {
         URI uri;
         try {
             uri = URI.create(url);

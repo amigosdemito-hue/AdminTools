@@ -1,6 +1,7 @@
 package com.admintools.service;
 
 import com.admintools.AdminToolsPlugin;
+import com.admintools.util.TimeUtil;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -76,6 +77,9 @@ public final class StaffModeService {
         if (saved == null) {
             return;
         }
+        // Una sesión de espectador no debe sobrevivir al modo staff: si sigue
+        // activa, al devolver el modo de juego se pisarían los dos estados.
+        plugin.getSpectate().endForStaffMode(player);
         try {
             player.setInvulnerable(saved.invulnerable());
             player.setAllowFlight(saved.allowFlight());
@@ -133,14 +137,19 @@ public final class StaffModeService {
                 "staff.mode-tool-vanish", "staff.mode-tool-vanish-lore"));
         player.getInventory().setItem(3, tool(Material.BOOK,
                 "staff.mode-tool-check", "staff.mode-tool-check-lore"));
+        player.getInventory().setItem(4, tool(Material.SPYGLASS,
+                "staff.mode-tool-spectate", "staff.mode-tool-spectate-lore",
+                "time", TimeUtil.format(plugin.getSettings().staffSpectateMillis()),
+                "cooldown", plugin.getSettings().staffSpectateCooldownMillis() <= 0L ? "0s"
+                        : TimeUtil.format(plugin.getSettings().staffSpectateCooldownMillis())));
     }
 
-    private ItemStack tool(Material material, String nameKey, String loreKey) {
+    private ItemStack tool(Material material, String nameKey, String loreKey, Object... placeholders) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.displayName(plugin.getMessages().get(nameKey));
-            meta.lore(List.of(plugin.getMessages().get(loreKey)));
+            meta.lore(List.of(plugin.getMessages().get(loreKey, placeholders)));
             item.setItemMeta(meta);
         }
         return item;

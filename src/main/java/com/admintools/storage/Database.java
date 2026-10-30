@@ -13,13 +13,16 @@ import java.sql.Statement;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 
 /**
  * Acceso a datos con dos dialectos: SQLite (archivo local, un servidor) y
@@ -61,7 +64,13 @@ public final class Database {
         this.settings = settings;
         this.dialect = settings.mysql() ? Dialect.MYSQL : Dialect.SQLITE;
         this.prefix = dialect == Dialect.MYSQL ? settings.tablePrefix() : "";
-        this.maxConnections = dialect == Dialect.SQLITE ? 1 : Math.max(1, settings.poolSize());
+        // SQLite en modo WAL admite varias conexiones a la vez: una escribe y el
+        // resto lee. Con una sola conexión, una copia de inventario en segundo plano
+        // dejaba esperando a la lectura del comando que estaba en el hilo principal.
+        // Las escrituras siguen serializándose solas (busy_timeout de 5 s).
+        this.maxConnections = dialect == Dialect.SQLITE
+                ? Math.min(4, Math.max(2, settings.poolSize()))
+                : Math.max(1, settings.poolSize());
         this.permits = new Semaphore(maxConnections, true);
         this.executor = Executors.newFixedThreadPool(Math.max(2, maxConnections),
                 runnable -> {
@@ -71,8 +80,7 @@ public final class Database {
                 });
 
         if (dialect == Dialect.MYSQL) {
-            this.url = "jdbc:mysql://" + settings.mysqlHost() + ":" + settings.mysqlPort() + "/"
-                    + settings.mysqlDatabase() + "?" + settings.mysqlParameters();
+            this.url = buildMysqlUrl();
         } else {
             File folder = plugin.getDataFolder();
             if (!folder.exists() && !folder.mkdirs()) {
@@ -80,6 +88,120 @@ public final class Database {
             }
             this.url = "jdbc:sqlite:" + new File(folder, "data.db").getAbsolutePath();
         }
+    }
+
+    // ------------------------------------------------------------
+    //  URL de MySQL
+    // ------------------------------------------------------------
+
+    /**
+     * Arma la URL JDBC tolerando lo que la gente pega de los paneles de hosting:
+     * {@code jdbc:mysql://host:3306/}, un host que ya trae el puerto, barras
+     * sobrantes o parámetros que empiezan por {@code ?}.
+     */
+    private String buildMysqlUrl() {
+        String host = settings.mysqlHost() == null ? "" : settings.mysqlHost().trim();
+        int port = settings.mysqlPort();
+
+        for (String prefix : List.of("jdbc:mysql://", "jdbc:mariadb://", "mysql://", "mariadb://")) {
+            if (host.regionMatches(true, 0, prefix, 0, prefix.length())) {
+                host = host.substring(prefix.length());
+                break;
+            }
+        }
+        int slash = host.indexOf('/');
+        if (slash >= 0) {
+            host = host.substring(0, slash);
+        }
+        if (host.startsWith("[") && host.contains("]")) {
+            // IPv6 literal: [::1]:3306
+            int end = host.indexOf(']');
+            String rest = host.substring(end + 1);
+            if (rest.startsWith(":")) {
+                port = parsePort(rest.substring(1), port);
+            }
+            host = host.substring(0, end + 1);
+        } else if (host.indexOf(':') >= 0) {
+            int colon = host.lastIndexOf(':');
+            port = parsePort(host.substring(colon + 1), port);
+            host = host.substring(0, colon);
+        }
+        if (host.isBlank()) {
+            host = "localhost";
+        }
+
+        String database = settings.mysqlDatabase() == null ? "" : settings.mysqlDatabase().trim();
+        while (database.startsWith("/")) {
+            database = database.substring(1);
+        }
+        while (database.endsWith("/")) {
+            database = database.substring(0, database.length() - 1);
+        }
+        if (database.isBlank()) {
+            database = "admintools";
+        }
+
+        return "jdbc:mysql://" + host + ":" + port + "/" + database + "?" + buildParameters();
+    }
+
+    private static int parsePort(String raw, int fallback) {
+        try {
+            int parsed = Integer.parseInt(raw.trim());
+            return parsed > 0 && parsed < 65536 ? parsed : fallback;
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    /**
+     * Normaliza los parámetros de la URL y añade lo que el conector necesita para
+     * funcionar por defecto: con TLS desactivado, MySQL 8+ usa
+     * {@code caching_sha2_password} y sin {@code allowPublicKeyRetrieval=true} la
+     * conexión muere con «Public Key Retrieval is not allowed».
+     */
+    private String buildParameters() {
+        Map<String, String> params = new LinkedHashMap<>();
+        String raw = settings.mysqlParameters() == null ? "" : settings.mysqlParameters().trim();
+        while (raw.startsWith("?") || raw.startsWith("&")) {
+            raw = raw.substring(1);
+        }
+        for (String pair : raw.split("&")) {
+            String entry = pair.trim();
+            if (entry.isEmpty()) {
+                continue;
+            }
+            int eq = entry.indexOf('=');
+            String key = eq < 0 ? entry : entry.substring(0, eq).trim();
+            String value = eq < 0 ? "true" : entry.substring(eq + 1).trim();
+            if (!key.isEmpty()) {
+                params.put(key.toLowerCase(Locale.ROOT), key + "=" + value);
+            }
+        }
+        boolean tlsOff = "false".equalsIgnoreCase(valueOf(params, "usessl"))
+                || "disabled".equalsIgnoreCase(valueOf(params, "sslmode"))
+                || "disabled".equalsIgnoreCase(valueOf(params, "ssl-mode"));
+        if (tlsOff && !params.containsKey("allowpublickeyretrieval")) {
+            params.put("allowpublickeyretrieval", "allowPublicKeyRetrieval=true");
+        }
+        return params.isEmpty() ? "" : String.join("&", params.values());
+    }
+
+    private static String valueOf(Map<String, String> params, String key) {
+        String entry = params.get(key);
+        if (entry == null) {
+            return null;
+        }
+        int eq = entry.indexOf('=');
+        return eq < 0 ? "" : entry.substring(eq + 1);
+    }
+
+    /** Destino de la conexión, sin contraseña, para los mensajes de consola. */
+    public String describeTarget() {
+        if (dialect == Dialect.SQLITE) {
+            return "SQLite " + new File(plugin.getDataFolder(), "data.db").getAbsolutePath();
+        }
+        String shown = url.replaceAll("(?i)(password=)[^&]*", "$1***");
+        return "MySQL " + shown + " (usuario " + settings.mysqlUser() + ")";
     }
 
     // ------------------------------------------------------------
@@ -604,14 +726,118 @@ public final class Database {
         plugin.getLogger().info("Base de datos lista (" + dialect.name().toLowerCase(Locale.ROOT) + ").");
     }
 
-    /** Prueba de conexión: devuelve null si todo va bien o el error si falla. */
+    /** Prueba de conexión: devuelve null si todo va bien o el motivo completo si falla. */
     public String test() {
         try {
             queryOne("SELECT 1", rs -> rs.getInt(1));
             return null;
         } catch (Exception ex) {
-            return ex.getMessage();
+            return diagnose(ex);
         }
+    }
+
+    /**
+     * Traduce un fallo de JDBC a algo accionable.
+     *
+     * <p>Antes se devolvía {@code ex.getMessage()}, que para un fallo de conexión
+     * era solo «Error de consulta: SELECT 1»: se perdía el motivo real (contraseña,
+     * base inexistente, firewall…) y era imposible diagnosticar desde el log.</p>
+     */
+    private String diagnose(Exception ex) {
+        if (settings.debug()) {
+            plugin.getLogger().log(Level.WARNING, "Detalle del fallo de conexión a " + describeTarget(), ex);
+        }
+
+        SQLException sql = null;
+        for (Throwable cursor = ex; cursor != null; cursor = cursor.getCause()) {
+            if (cursor instanceof SQLException found) {
+                sql = found;
+            }
+        }
+
+        String rootMessage = ex.getMessage();
+        Throwable root = ex;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String deepest = root.getMessage() == null ? "" : root.getMessage().trim();
+        if (!deepest.isEmpty() && (rootMessage == null || !rootMessage.contains(deepest))) {
+            rootMessage = (rootMessage == null ? "" : rootMessage + " — ") + deepest;
+        }
+
+        StringBuilder out = new StringBuilder();
+        out.append(rootMessage == null ? ex.getClass().getSimpleName() : rootMessage.replace('\n', ' '));
+        if (sql != null) {
+            if (sql.getSQLState() != null) {
+                out.append(" [SQLState ").append(sql.getSQLState()).append(']');
+            }
+            if (sql.getErrorCode() != 0) {
+                out.append(" [código ").append(sql.getErrorCode()).append(']');
+            }
+        }
+
+        String hint = hint(sql, rootMessage == null ? "" : rootMessage, root);
+        if (hint != null) {
+            out.append(System.lineSeparator()).append("  -> ").append(hint);
+        }
+        out.append(System.lineSeparator()).append("  -> Probado contra: ").append(describeTarget());
+        return out.toString();
+    }
+
+    /**
+     * Pista según el error de MySQL, para no dejar al usuario adivinando.
+     *
+     * <p>Se apoya en la excepción y en el código siempre que se puede: el conector
+     * traduce sus mensajes al idioma del servidor, así que buscar solo texto en
+     * inglés falla (p. ej. «Host desconocido» en vez de «Unknown host»).</p>
+     */
+    private String hint(SQLException sql, String message, Throwable root) {
+        String lower = message.toLowerCase(Locale.ROOT);
+        int code = sql == null ? 0 : sql.getErrorCode();
+        String state = sql == null || sql.getSQLState() == null ? "" : sql.getSQLState();
+
+        if (root instanceof java.net.UnknownHostException
+                || lower.contains("unknownhost") || lower.contains("host desconocido")) {
+            return "El host no resuelve: revisa que storage.mysql.host sea el que indica el panel "
+                    + "(sin http:// y sin puerto, el puerto va en port).";
+        }
+
+        if (lower.contains("public key retrieval")) {
+            return "Añade allowPublicKeyRetrieval=true a storage.mysql.parameters (con TLS desactivado, MySQL 8+ lo exige).";
+        }
+        if (code == 1045) {
+            return "Acceso denegado: revisa usuario y contraseña, y que ese usuario tenga permisos sobre la base.";
+        }
+        if (code == 1044) {
+            return "El usuario existe pero no tiene permiso sobre esa base de datos: concédelo en el panel del hosting.";
+        }
+        if (code == 1049) {
+            return "Esa base de datos no existe. En hostings suele llevar el prefijo del usuario (ej. usuario_admintools).";
+        }
+        if (code == 1130) {
+            return "El servidor MySQL no permite conexiones desde esta máquina: autoriza el host/IP en el panel.";
+        }
+        if (code == 1129 || lower.contains("blocked because of many connection errors")) {
+            return "Host bloqueado por demasiados intentos fallidos: espera unos minutos y vuelve a probar.";
+        }
+        if (code == 1698 || lower.contains("unix_socket")) {
+            return "Ese usuario usa autenticación por socket del sistema: cámbialo a contraseña (mysql_native_password o caching_sha2_password).";
+        }
+        if (lower.contains("require_secure_transport") || lower.contains("ssl") && lower.contains("required")) {
+            return "El servidor exige TLS: quita useSSL=false de storage.mysql.parameters (o usa sslMode=REQUIRED).";
+        }
+        if (lower.contains("no suitable driver")) {
+            return "Este Paper no cargó el conector de MySQL: usa una versión de Paper que lo incluya o añádelo como librería.";
+        }
+        if (lower.contains("communications link failure") || lower.contains("connection refused")
+                || code == 2002 || code == 2003 || state.equals("08S01")) {
+            return "No se pudo abrir el socket: host o puerto incorrectos, firewall, o MySQL no acepta conexiones remotas "
+                    + "(en hosting usa el host interno, normalmente localhost, y el puerto del panel).";
+        }
+        if (code == 3159) {
+            return "El servidor exige conexión segura (TLS): ajusta sslMode en storage.mysql.parameters.";
+        }
+        return null;
     }
 
     public void close() {

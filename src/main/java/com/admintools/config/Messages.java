@@ -24,6 +24,16 @@ public final class Messages {
     private final java.util.Set<String> missing = ConcurrentHashMap.newKeySet();
     private String prefix = "";
 
+    /**
+     * Versión del formato de los mensajes. Al subirla, el archivo del usuario se
+     * regenera con el diseño nuevo (guardando antes una copia de sus textos).
+     *
+     * <p>Sin esto, quien ya tenía el plugin instalado seguía viendo el formato
+     * antiguo para siempre: el archivo de su carpeta de datos tiene prioridad sobre
+     * el del jar.</p>
+     */
+    private static final int MESSAGES_VERSION = 2;
+
     public Messages(AdminToolsPlugin plugin) {
         this.plugin = plugin;
     }
@@ -40,6 +50,8 @@ public final class Messages {
         File file = new File(plugin.getDataFolder(), fileName);
         if (!file.exists() && plugin.getResource(fileName) != null) {
             plugin.saveResource(fileName, false);
+        } else if (file.exists()) {
+            upgradeIfOutdated(file, fileName);
         }
 
         YamlConfiguration yaml = new YamlConfiguration();
@@ -64,6 +76,29 @@ public final class Messages {
 
         flatten(yaml, "");
         prefix = yaml.getString("prefix", "");
+    }
+
+    /**
+     * Sustituye el archivo de mensajes del usuario por el del jar si es de un formato
+     * anterior, dejando sus textos guardados al lado. Con la misma versión (o una más
+     * nueva, si el usuario la subió a mano) no se toca nada.
+     */
+    private void upgradeIfOutdated(File file, String fileName) {
+        YamlConfiguration current = YamlConfiguration.loadConfiguration(file);
+        int installed = current.getInt("messages-version", 1);
+        if (installed >= MESSAGES_VERSION || plugin.getResource(fileName) == null) {
+            return;
+        }
+        File backup = new File(file.getParentFile(), fileName + ".v" + installed + ".bak");
+        try {
+            java.nio.file.Files.copy(file.toPath(), backup.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            plugin.saveResource(fileName, true);
+            plugin.getLogger().info("Mensajes de " + fileName + " actualizados al formato " + MESSAGES_VERSION
+                    + ". Tus textos anteriores están en " + backup.getName() + ".");
+        } catch (Exception ex) {
+            plugin.getLogger().warning("No pude actualizar " + fileName + ": " + ex.getMessage());
+        }
     }
 
     private void flatten(YamlConfiguration yaml, String prefix) {

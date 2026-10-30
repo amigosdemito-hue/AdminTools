@@ -9,6 +9,23 @@ language: es
 # Mostrar trazas completas en consola cuando algo falla (útil al depurar)
 debug: false
 
+# ------------------------------------------------------------
+#  Presencia en consola
+#  El letrero de arranque resume versión, servidor, almacenamiento, módulos,
+#  integraciones y estado en un solo bloque, para verlo de un vistazo entre
+#  las líneas del servidor.
+# ------------------------------------------------------------
+console:
+  # Dibujar el letrero al arrancar. false = arranque discreto (una línea).
+  banner: true
+  # Color del letrero:
+  #   auto   = usa colores ANSI si la consola los soporta (normal en Paper,
+  #            Pterodactyl y consolas modernas) y texto plano si no.
+  #   always = fuerza colores ANSI.
+  #   never  = texto plano: el dibujo se ve igual pero el archivo latest.log
+  #            queda sin códigos de escape (recomendado si lees el log con grep).
+  color: auto
+
 # Nombre de esta instancia. Con MySQL compartido entre varios servidores,
 # sirve para saber en cuál ocurrió cada sanción o reporte. Vacío = nombre del servidor.
 server-name: ""
@@ -29,9 +46,12 @@ storage:
     # Parámetros extra de la conexión (se añaden tal cual a la URL JDBC)
     parameters: "useSSL=false&characterEncoding=utf8&serverTimezone=UTC"
     table-prefix: "sa_"
-  # Cuántas consultas pueden ejecutarse a la vez en paralelo.
-  # Con sqlite deja 1 (el archivo no soporta escrituras concurrentes).
-  pool-size: 1
+  # Cuántas conexiones se abren a la vez.
+  # En sqlite se usa WAL: varias conexiones pueden leer mientras una escribe,
+  # así que lo normal es dejar 4 (se admiten de 2 a 4). Con 1, una copia de
+  # inventario en segundo plano bloqueaba la lectura de un comando.
+  # En mysql súbelo si tienes mucho staff trabajando a la vez.
+  pool-size: 4
   # Retención de datos: se purga automáticamente lo viejo
   retention:
     chat-days: 30
@@ -187,6 +207,17 @@ reports:
   cooldown-seconds: 120
   max-open-per-player: 3
   notify-staff: true
+  # ── Webhook de los reportes (/report) ──────────────────────────
+  # PARA QUÉ: canal PRIVADO del staff donde caen los reportes. Cada /report llega
+  #   como un embed con la cabeza del reportado, quién reporta, el motivo, la
+  #   fecha y el número de reporte.
+  # DE DÓNDE SE SACA: Discord → ajustes del canal → Integraciones → Webhooks →
+  #   Nuevo webhook → Copiar URL del webhook.
+  # SI SE DEJA VACÍO: se usa announcements.staff-webhook y, si tampoco hay, el
+  #   webhook general de la sección "discord".
+  # Cada canal de Discord necesita SU PROPIO webhook: Discord no permite publicar
+  # en un canal con el enlace de otro.
+  discord-webhook: ""
   # Si es true, el reportero queda oculto en la cola
   anonymous: false
   # Solo se puede reportar a jugadores online
@@ -220,7 +251,9 @@ watchdog:
     disk-warn-percent: 90.0
   # No repetir la misma alerta antes de estos minutos
   alert-cooldown-minutes: 10
-  # Enviar también las alertas a Discord
+  # Enviar también las alertas a Discord.
+  # PARA QUÉ: avisar en el canal de discord.webhook-url cuando el TPS, el MSPT,
+  #   la RAM o el disco pasan de los umbrales de arriba.
   discord: true
 
 # ------------------------------------------------------------
@@ -249,15 +282,39 @@ backups:
   plugins-config: true
   folder: backups
 
+# ============================================================
+#  Canales de Discord — qué webhook va en cada sitio
+#  Cada canal de Discord necesita SU PROPIO webhook (Discord no deja publicar
+#  en un canal con el enlace de otro). Todos se sacan igual:
+#    Discord → ajustes del canal → Integraciones → Webhooks → Nuevo webhook
+#    → Copiar URL del webhook   (empieza por https://discord.com/api/webhooks/...)
+#
+#    discord.webhook-url          alertas del plugin: sanciones, reportes y
+#                                 rendimiento. Es el "general": si una sección
+#                                 no tiene webhook propio, se usa éste.
+#    reports.discord-webhook      cola de /report (canal privado del staff)
+#    announcements.public-webhook anuncios de sanciones (canal público)
+#    announcements.staff-webhook  copia de esos anuncios (canal del staff)
+#    staff.action-log.webhook     registro de comandos del staff (privado)
+# ============================================================
+
 # ------------------------------------------------------------
-#  Discord (alertas por webhook)
+#  Discord — alertas del plugin
+#  PARA QUÉ: canal donde el plugin avisa de las sanciones que se aplican, de
+#    los reportes recibidos y de los problemas de rendimiento (watchdog).
+#  SI SE DEJA VACÍO: no se envía ninguna alerta. El resto del plugin funciona
+#    igual y no se pierde nada en la base de datos.
 #  El URL es un secreto: no lo compartas ni lo subas al repositorio.
 # ------------------------------------------------------------
 discord:
+  # Interruptor de las alertas de "events" y del watchdog. No afecta al
+  # registro de staff, que tiene el suyo en staff.action-log.
   enabled: false
+  # Webhook del canal de alertas (ver arriba cómo se consigue).
   webhook-url: ""
   username: "AdminTools"
   avatar-url: ""
+  # Qué eventos se anuncian en ese canal.
   events:
     ban: true
     mute: true
@@ -265,6 +322,40 @@ discord:
     warn: true
     report: true
     watchdog: true
+
+# ------------------------------------------------------------
+#  Anuncios de sanciones (canal público de la comunidad)
+#  Es independiente del registro de staff: aquel audita lo que hace cada rango,
+#  éste publica la moderación. Cada canal tiene su propio webhook y se pueden usar
+#  los dos a la vez. Los URLs son secretos: no los subas al repositorio.
+# ------------------------------------------------------------
+announcements:
+  enabled: false
+  # ── Webhook del canal PÚBLICO ─────────────────────────────────
+  # PARA QUÉ: la comunidad ve cada sanción (ban, cárcel, mute, congelamiento)
+  #   con la cabeza del sancionado, el motivo, la duración y la cuenta atrás.
+  # SI SE DEJA VACÍO: no se publica nada en el canal público.
+  public-webhook: ""
+  # ── Webhook del canal PRIVADO DEL STAFF ───────────────────────
+  # PARA QUÉ: misma sanción, pero firmada por quien la emitió (su nombre y su
+  #   cabeza) y también con el aviso de fin. Es la copia de control del equipo.
+  #   Si staff.action-log.webhook está vacío, el registro de comandos del staff
+  #   también se manda a este canal.
+  # SI SE DEJA VACÍO: no se manda copia al staff.
+  staff-webhook: ""
+  # Nombre con el que el bot publica (vacío = el mismo de discord.username).
+  username: "AdminTools"
+  # Cabeza de la skin. {uuid} y {name} se sustituyen por los datos del jugador;
+  # con el UUID el avatar no cambia si el jugador se cambia de nombre.
+  head-url: "https://mc-heads.net/avatar/{uuid}/128"
+  # Avisar también del fin de las sanciones temporales, con otro embed.
+  announce-end: true
+  # Qué sanciones se anuncian.
+  types:
+    ban: true
+    jail: true
+    mute: true
+    freeze: true
 
 # ------------------------------------------------------------
 #  Herramientas de staff
@@ -307,6 +398,37 @@ staff:
     give-tools: true
     # Impide recoger ítems del suelo mientras el modo staff está activo.
     block-pickup: true
+  # Espectador de vigilancia: el visor de la hotbar del modo staff pone al
+  # jugador en espectador de verdad (atraviesa bloques, no puede tocar nada y
+  # los demás no lo ven). Como pierde la barra rápida mientras dura, el tiempo
+  # es corto y se puede salir antes con /spectate.
+  spectate:
+    enabled: true
+    # Segundos que puede estar activo antes de salir solo (mínimo 30).
+    seconds: 300
+    # Segundos de espera antes de poder volver a usarlo (0 = sin recarga).
+    cooldown-seconds: 900
+  # ── Registro de uso del staff (helpers, moderadores y admins) ──
+  # PARA QUÉ: llevar control de lo que hace cada rango. Anota CADA comando y
+  #   cada herramienta (vanish, espectador, invsee, freeze…) con quién, qué y
+  #   sobre quién, en un canal privado que solo ve el equipo. Las contraseñas,
+  #   correos y el doble factor nunca se escriben.
+  # SE ENVÍA AGRUPADO: una línea por acción, hasta 12 por mensaje cada 3 s.
+  action-log:
+    # Activa el registro. Si está en true y no hay webhook, el arranque avisa en
+    # consola diciendo exactamente qué falta.
+    discord: false
+    # Anotar TAMBIÉN los comandos que no son del plugin: /give, /gamemode, /tp,
+    # /msg y los de otros plugins (EssentialsX, WorldEdit...). Sólo se registran
+    # si quien los ejecuta tiene rango helper, moderador o admin; la consola no
+    # entra. Los comandos del propio AdminTools ya se anotan por su cuenta, así
+    # que no se duplican. Todo esto queda también en /audit.
+    all-commands: true
+    # ── Webhook del canal privado del staff ─────────────────────
+    # PARA QUÉ: recibir ese registro de comandos y herramientas.
+    # SI SE DEJA VACÍO: se usa announcements.staff-webhook (el canal privado del
+    #   staff de los anuncios) y, si tampoco hay, el webhook general de "discord".
+    webhook: ""
 
 # ------------------------------------------------------------
 #  Cárcel

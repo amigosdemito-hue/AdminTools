@@ -100,7 +100,7 @@ public final class StaffModeListener implements Listener {
             return;
         }
         if (item.getType() == Material.CLOCK) {
-            plugin.getStaffState().toggleVanish(player);
+            toggleVanish(player);
             return;
         }
         Player target = (Player) event.getRightClicked();
@@ -151,7 +151,16 @@ public final class StaffModeListener implements Listener {
                 if (event.getHand() != EquipmentSlot.HAND) {
                     return;
                 }
-                plugin.getStaffState().toggleVanish(player);
+                toggleVanish(player);
+            }
+            case SPYGLASS -> {
+                // Espectador de vigilancia: el visor de la hotbar. Tiene su propio
+                // límite y recarga; al salir se devuelve el modo de juego.
+                event.setCancelled(true);
+                if (event.getHand() != EquipmentSlot.HAND) {
+                    return;
+                }
+                plugin.getSpectate().toggle(player);
             }
             case BOOK -> {
                 event.setCancelled(true);
@@ -178,6 +187,12 @@ public final class StaffModeListener implements Listener {
     private void teleportTo(Player player, String name) {
         // /tp anota el /back, comprueba la exención y avisa al destino.
         Bukkit.dispatchCommand(player, "admintools:tp " + name);
+    }
+
+    /** Vanish desde la herramienta: se anota también en el registro de staff. */
+    private void toggleVanish(Player player) {
+        boolean on = plugin.getStaffState().toggleVanish(player);
+        plugin.getStaffLog().action(player, "vanish", on ? "on" : "off");
     }
 
     private void toggleFreeze(Player player, String name) {

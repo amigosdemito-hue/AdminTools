@@ -36,6 +36,9 @@ public final class StaffCommands extends CommandSupport {
                         state.toggleVanish(player);
                         return;
                     }
+                    // Ocultar a otro miembro del staff no es lo mismo que ocultarte a ti:
+                    // con el permiso básico, un helper podía apagar la vigilancia de un admin.
+                    requirePermission(sender, "admintools.staff.vanish.others");
                     Player other = requireOnline(args[0]);
                     boolean vanished = state.toggleVanish(other);
                     plugin.getMessages().send(sender, vanished ? "staff.vanish-other-on" : "staff.vanish-other-off",
@@ -44,7 +47,7 @@ public final class StaffCommands extends CommandSupport {
 
         registry.register("freeze")
                 .permission("admintools.staff.freeze")
-                .usage("/freeze <jugador>")
+                .usage("/freeze <jugador> [motivo]")
                 .completer((sender, args) -> CommandRegistry.players())
                 .minArgs(1)
                 .noAudit().run((sender, args) -> {
@@ -55,7 +58,11 @@ public final class StaffCommands extends CommandSupport {
                     }
                     UUID uuid = target.getUniqueId();
                     boolean frozen = !plugin.getPlayerService().frozen(uuid);
+                    // Motivo opcional: se usa en el anuncio de Discord y en la auditoría.
+                    String reason = args.length > 1
+                            ? String.join(" ", java.util.Arrays.copyOfRange(args, 1, args.length)) : "";
                     plugin.getPlayerService().setFrozen(uuid, frozen);
+                    plugin.getSanctionAnnounce().freeze(target, frozen, staffName(sender), reason, sender);
                     if (frozen) {
                         target.sendMessage(plugin.getMessages().get("staff.freeze-target"));
                         plugin.getMessages().send(sender, "staff.freeze-staff", "player", target.getName());
@@ -66,7 +73,8 @@ public final class StaffCommands extends CommandSupport {
                         plugin.getMessages().send(sender, "staff.freeze-staff-off", "player", target.getName());
                         state.sendToStaff(plugin.getMessages().get("staff.freeze-off", "player", target.getName()));
                     }
-                    plugin.getAuditService().log(sender, frozen ? "freeze.on" : "freeze.off", target.getName(), "");
+                    plugin.getAuditService().log(sender, frozen ? "freeze.on" : "freeze.off", target.getName(),
+                            frozen ? reason : "");
                 });
 
         registry.register("staffchat")
@@ -192,6 +200,25 @@ public final class StaffCommands extends CommandSupport {
                             "playtime", record.playtimeText().isEmpty() ? "0s" : record.playtimeText(),
                             "sessions", record.sessions(),
                             "first_seen", TimeUtil.formatDate(record.firstSeen()));
+                });
+
+        registry.register("spectate")
+                .permission("admintools.staff.mode")
+                .usage("/spectate [jugador]")
+                .completer((sender, args) -> CommandRegistry.players())
+                .noAudit().run((sender, args) -> {
+                    // También sirve desde la consola para cortar una sesión a mano.
+                    if (args.length > 0) {
+                        requirePermission(sender, "admintools.staff.spectate.others");
+                        Player target = requireOnline(args[0]);
+                        if (!plugin.getSpectate().active(target.getUniqueId())) {
+                            throw new CommandException(plugin.getMessages().raw("staff.spectate-not-active",
+                                    "player", target.getName()));
+                        }
+                        plugin.getSpectate().stop(target, "manual", true);
+                        return;
+                    }
+                    plugin.getSpectate().toggle(requirePlayer(sender));
                 });
 
         registry.register("follow")

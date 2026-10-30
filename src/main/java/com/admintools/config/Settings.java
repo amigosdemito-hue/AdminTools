@@ -53,6 +53,14 @@ public final class Settings {
     private int staffActionMaxPerMinute;
     private boolean staffModeGiveTools;
     private boolean staffModeBlockPickup;
+    private boolean staffSpectateEnabled;
+    private long staffSpectateMillis;
+    private long staffSpectateCooldownMillis;
+    private boolean consoleBanner;
+    private String consoleColor;
+    private boolean staffActionLogDiscord;
+    private boolean staffActionLogAllCommands;
+    private String staffActionLogWebhook;
     private boolean vanishPickup;
     private boolean vanishSilentContainers;
     private boolean vanishSilentActions;
@@ -94,6 +102,7 @@ public final class Settings {
     private boolean reportNotifyStaff;
     private boolean reportAnonymous;
     private boolean reportRequireOnline;
+    private String reportDiscordWebhook;
     private boolean altsEnabled;
     private boolean altsCgnatExempt;
     private boolean altsBlockMulti;
@@ -141,6 +150,13 @@ public final class Settings {
     private String discordUsername;
     private String discordAvatar;
     private Map<String, Boolean> discordEvents;
+    private boolean announcementsEnabled;
+    private String announcementsPublicWebhook;
+    private String announcementsStaffWebhook;
+    private String announcementsUsername;
+    private String announcementsHeadUrl;
+    private boolean announcementsEnd;
+    private Map<String, Boolean> announcementsTypes;
     private boolean debug;
     private String serverName;
     private boolean hookLuckPerms;
@@ -208,6 +224,13 @@ public final class Settings {
         staffActionMaxPerMinute = Math.max(0, num("staff.action-limit.max-per-minute", 40));
         staffModeGiveTools = bool("staff.mode.give-tools", true);
         staffModeBlockPickup = bool("staff.mode.block-pickup", true);
+        staffSpectateEnabled = bool("staff.spectate.enabled", true);
+        // Suelo de 30 s: un límite más corto no da ni para abrir la ventana del menú.
+        staffSpectateMillis = Math.max(30, num("staff.spectate.seconds", 300)) * 1000L;
+        staffSpectateCooldownMillis = Math.max(0, num("staff.spectate.cooldown-seconds", 900)) * 1000L;
+        staffActionLogDiscord = bool("staff.action-log.discord", false);
+        staffActionLogAllCommands = bool("staff.action-log.all-commands", true);
+        staffActionLogWebhook = str("staff.action-log.webhook", "");
         vanishPickup = bool("staff.vanish-pickup", false);
         vanishSilentContainers = bool("staff.vanish-silent-containers", true);
         vanishSilentActions = bool("staff.vanish-silent-actions", true);
@@ -251,6 +274,7 @@ public final class Settings {
         reportNotifyStaff = bool("reports.notify-staff", true);
         reportAnonymous = bool("reports.anonymous", false);
         reportRequireOnline = bool("reports.require-online-target", true);
+        reportDiscordWebhook = str("reports.discord-webhook", "");
 
         altsEnabled = bool("alts.enabled", true);
         altsCgnatExempt = bool("alts.cgnat-exempt", false);
@@ -326,7 +350,30 @@ public final class Settings {
         }
         discordEvents = Map.copyOf(events);
 
+        // Anuncios de sanciones: canales propios, separados del webhook de alertas.
+        announcementsEnabled = bool("announcements.enabled", false);
+        announcementsPublicWebhook = str("announcements.public-webhook", "");
+        announcementsStaffWebhook = str("announcements.staff-webhook", "");
+        String announceName = str("announcements.username", "");
+        announcementsUsername = announceName.isBlank() ? discordUsername : announceName;
+        announcementsHeadUrl = str("announcements.head-url", "https://mc-heads.net/avatar/{uuid}/128");
+        announcementsEnd = bool("announcements.announce-end", true);
+        Map<String, Boolean> announced = new LinkedHashMap<>();
+        for (String kind : List.of("ban", "jail", "mute", "freeze")) {
+            announced.put(kind, bool("announcements.types." + kind, true));
+        }
+        announcementsTypes = Map.copyOf(announced);
+
         debug = bool("debug", false);
+        consoleBanner = bool("console.banner", true);
+        // console.color acepta auto / always / never y también true/false.
+        consoleColor = config.isString("console.color")
+                ? switch (str("console.color", "auto").toLowerCase(Locale.ROOT)) {
+                    case "always", "true", "on" -> "always";
+                    case "never", "false", "off" -> "never";
+                    default -> "auto";
+                }
+                : (bool("console.color", true) ? "auto" : "never");
         serverName = str("server-name", "");
         if (serverName.isBlank()) {
             serverName = org.bukkit.Bukkit.getServer().getName();
@@ -768,6 +815,61 @@ public final class Settings {
         return staffModeBlockPickup;
     }
 
+    public boolean staffSpectateEnabled() {
+        return staffSpectateEnabled;
+    }
+
+    /** Duración máxima del espectador de vigilancia, en milisegundos. */
+    public long staffSpectateMillis() {
+        return staffSpectateMillis;
+    }
+
+    /** Recarga del espectador, en milisegundos (0 = sin recarga). */
+    public long staffSpectateCooldownMillis() {
+        return staffSpectateCooldownMillis;
+    }
+
+    /** ¿Se manda el registro de acciones del staff al webhook de Discord? */
+    public boolean staffActionLogDiscord() {
+        return staffActionLogDiscord;
+    }
+
+    /** ¿Anotar también los comandos de otros plugins y del servidor (/give, /gamemode...)? */
+    public boolean staffActionLogAllCommands() {
+        return staffActionLogAllCommands;
+    }
+
+    /**
+     * Canal del registro de staff: el suyo si está puesto y, si no, el general de
+     * {@code integrations.discord}.
+     *
+     * <p>Antes solo existía el general y además exigía {@code discord.enabled}: quien
+     * activaba el registro sin tocar las alertas no veía nada y no había ningún aviso
+     * que explicara por qué.</p>
+     */
+    public String staffActionLogWebhook() {
+        if (staffActionLogWebhook != null && !staffActionLogWebhook.isBlank()) {
+            return staffActionLogWebhook.trim();
+        }
+        // El canal privado del staff de los anuncios ya es, casi siempre, el mismo
+        // sitio donde se quiere este registro: si existe, se usa antes que el general.
+        if (announcementsStaffWebhook != null && !announcementsStaffWebhook.isBlank()) {
+            return announcementsStaffWebhook.trim();
+        }
+        return discordEnabled ? discordWebhook : "";
+    }
+
+    /** De qué ajuste salió el webhook del registro, para decirlo en el arranque. */
+    public String staffActionLogTarget() {
+        if (staffActionLogWebhook != null && !staffActionLogWebhook.isBlank()) {
+            return "staff.action-log.webhook";
+        }
+        if (announcementsStaffWebhook != null && !announcementsStaffWebhook.isBlank()) {
+            return "announcements.staff-webhook";
+        }
+        return "integrations.discord.webhook-url";
+    }
+
     public boolean autoEscalateEnabled() {
         return autoEscalateEnabled;
     }
@@ -880,6 +982,23 @@ public final class Settings {
         return reportAnonymous;
     }
 
+    /**
+     * Webhook del canal privado de reportes.
+     *
+     * <p>Un canal propio es lo habitual, pero exigirlo obligaba a configurar otra URL
+     * para algo que ya tiene destino: si está vacío se usa la copia de staff de los
+     * anuncios y, en último término, el webhook general de alertas.</p>
+     */
+    public String reportDiscordWebhook() {
+        if (reportDiscordWebhook != null && !reportDiscordWebhook.isBlank()) {
+            return reportDiscordWebhook;
+        }
+        if (announcementsStaffWebhook != null && !announcementsStaffWebhook.isBlank()) {
+            return announcementsStaffWebhook;
+        }
+        return discordEnabled ? discordWebhook : "";
+    }
+
     public boolean reportRequireOnline() {
         return reportRequireOnline;
     }
@@ -980,8 +1099,50 @@ public final class Settings {
         return discordEvents.getOrDefault(key, false);
     }
 
+    public boolean announcementsEnabled() {
+        return announcementsEnabled;
+    }
+
+    /** Canal público de la comunidad (anuncios de sanciones). */
+    public String announcementsPublicWebhook() {
+        return announcementsPublicWebhook;
+    }
+
+    /** Canal privado del staff (copia del anuncio, firmada por quien sancionó). */
+    public String announcementsStaffWebhook() {
+        return announcementsStaffWebhook;
+    }
+
+    public String announcementsUsername() {
+        return announcementsUsername == null || announcementsUsername.isBlank() ? discordUsername : announcementsUsername;
+    }
+
+    /** Plantilla de la cabeza de la skin: admite {uuid} y {name}. */
+    public String announcementsHeadUrl() {
+        return announcementsHeadUrl;
+    }
+
+    public boolean announcementsEnd() {
+        return announcementsEnd;
+    }
+
+    /** ¿Se anuncian las sanciones de este tipo (ban, jail, mute, freeze)? */
+    public boolean announcementsType(String kind) {
+        return announcementsTypes.getOrDefault(kind, false);
+    }
+
     public boolean debug() {
         return debug;
+    }
+
+    /** ¿Dibujar el letrero de arranque en consola? */
+    public boolean consoleBanner() {
+        return consoleBanner;
+    }
+
+    /** Color del letrero: auto, always o never. */
+    public String consoleColor() {
+        return consoleColor;
     }
 
     /** Nombre de esta instancia (útil cuando varios servidores comparten base de datos). */

@@ -153,6 +153,8 @@ public final class CommandRegistry implements CommandExecutor, TabCompleter {
 
     private final AdminToolsPlugin plugin;
     private final Map<String, Definition> definitions = new LinkedHashMap<>();
+    /** Nombres y alias que despacha este registro (/at, /ban, /gm...). */
+    private final Set<String> labels = new java.util.LinkedHashSet<>();
 
     public CommandRegistry(AdminToolsPlugin plugin) {
         this.plugin = plugin;
@@ -162,6 +164,7 @@ public final class CommandRegistry implements CommandExecutor, TabCompleter {
     public Definition register(String name) {
         Definition definition = new Definition(name);
         definitions.put(name.toLowerCase(Locale.ROOT), definition);
+        labels.add(name.toLowerCase(Locale.ROOT));
         PluginCommand command = plugin.getCommand(name);
         if (command == null) {
             plugin.getLogger().severe("El comando /" + name + " no está declarado en plugin.yml");
@@ -169,7 +172,18 @@ public final class CommandRegistry implements CommandExecutor, TabCompleter {
         }
         command.setExecutor(this);
         command.setTabCompleter(this);
+        // Los alias cuentan como propios: /at, /gm o /cc no deben acabar
+        // anotados dos veces en el registro de staff.
+        labels.add(command.getName().toLowerCase(Locale.ROOT));
+        for (String alias : command.getAliases()) {
+            labels.add(alias.toLowerCase(Locale.ROOT));
+        }
         return definition;
+    }
+
+    /** ¿Este nombre (nombres y alias incluidos) lo despacha el plugin? */
+    public boolean owns(String label) {
+        return label != null && labels.contains(label.toLowerCase(Locale.ROOT));
     }
 
     /** Todas las definiciones registradas (para la ayuda). */
@@ -223,6 +237,10 @@ public final class CommandRegistry implements CommandExecutor, TabCompleter {
             plugin.getAuditService().log(sender, definition.name, args.length > 0 ? args[0] : "-",
                     String.join(" ", args));
         }
+        // Registro externo del staff (canal privado de Discord). Va aparte de la
+        // auditoría de la base: anota también las herramientas marcadas noAudit,
+        // que son justo las que interesa vigilar (vanish, invsee, freeze...).
+        plugin.getStaffLog().command(sender, definition.name, args);
         return true;
     }
 

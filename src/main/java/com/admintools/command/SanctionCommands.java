@@ -98,8 +98,7 @@ public final class SanctionCommands extends CommandSupport {
                     Sanction applied = sanctions.apply(new SanctionService.Request(
                             com.admintools.model.PunishmentType.BAN, uuid, display, ipIfKnown(uuid, name),
                             reason(args, reasonFrom), duration, staffUuid(sender), staffName(sender), silent, null, null));
-                    plugin.getMessages().send(sender, "sanctions.applied", "id", applied.id(), "player", display,
-                            "type", applied.type().display(), "duration", sanctions.durationText(duration));
+                    confirmApplied(sender, applied, display, duration);
                 });
 
         registry.register("tempban")
@@ -127,8 +126,7 @@ public final class SanctionCommands extends CommandSupport {
                             com.admintools.model.PunishmentType.BAN, uuid, display, ipIfKnown(uuid, name),
                             reason(args, 2), duration, staffUuid(sender), staffName(sender), silent, null, null);
                     Sanction applied = sanctions.apply(request);
-                    plugin.getMessages().send(sender, "sanctions.applied", "id", applied.id(), "player", display,
-                            "type", applied.type().display(), "duration", sanctions.durationText(duration));
+                    confirmApplied(sender, applied, display, duration);
                 });
 
         registry.register("ipban")
@@ -170,8 +168,7 @@ public final class SanctionCommands extends CommandSupport {
                             com.admintools.model.PunishmentType.IP_BAN, uuid == null ? new UUID(0L, 0L) : uuid, display,
                             ip, reason(args, 1), duration, staffUuid(sender), staffName(sender), silent, null, null);
                     Sanction applied = sanctions.apply(request);
-                    plugin.getMessages().send(sender, "sanctions.applied", "id", applied.id(), "player", display,
-                            "type", applied.type().display(), "duration", sanctions.durationText(duration));
+                    confirmApplied(sender, applied, display, duration);
                 });
 
         registry.register("unban")
@@ -230,8 +227,7 @@ public final class SanctionCommands extends CommandSupport {
                             com.admintools.model.PunishmentType.MUTE, uuid, display, null, reason(args, 1), duration,
                             staffUuid(sender), staffName(sender), silent, null, null);
                     Sanction applied = sanctions.apply(request);
-                    plugin.getMessages().send(sender, "sanctions.applied", "id", applied.id(), "player", display,
-                            "type", applied.type().display(), "duration", sanctions.durationText(duration));
+                    confirmApplied(sender, applied, display, duration);
                 });
 
         registry.register("tempmute")
@@ -257,8 +253,7 @@ public final class SanctionCommands extends CommandSupport {
                     Sanction applied = sanctions.apply(new SanctionService.Request(
                             com.admintools.model.PunishmentType.MUTE, uuid, display, null, reason(args, 2), duration,
                             staffUuid(sender), staffName(sender), silent, null, null));
-                    plugin.getMessages().send(sender, "sanctions.applied", "id", applied.id(), "player", display,
-                            "type", applied.type().display(), "duration", sanctions.durationText(duration));
+                    confirmApplied(sender, applied, display, duration);
                 });
 
         registry.register("shadowmute")
@@ -336,8 +331,7 @@ public final class SanctionCommands extends CommandSupport {
                             com.admintools.model.PunishmentType.IP_MUTE,
                             uuid == null ? new UUID(0L, 0L) : uuid, display, ip, reason(args, reasonFrom),
                             duration, staffUuid(sender), staffName(sender), silent, null, null));
-                    plugin.getMessages().send(sender, "sanctions.applied", "id", applied.id(), "player", display,
-                            "type", applied.type().display(), "duration", sanctions.durationText(duration));
+                    confirmApplied(sender, applied, display, duration);
                 });
 
         registry.register("unmute")
@@ -393,8 +387,7 @@ public final class SanctionCommands extends CommandSupport {
                     Sanction applied = sanctions.apply(new SanctionService.Request(
                             com.admintools.model.PunishmentType.WARN, uuid, display, null, reason(args, 1),
                             TimeUtil.PERMANENT, staffUuid(sender), staffName(sender), silent, null, null));
-                    plugin.getMessages().send(sender, "sanctions.applied", "id", applied.id(), "player", display,
-                            "type", applied.type().display(), "duration", "-");
+                    confirmApplied(sender, applied, display, 0L);
                 });
 
         registry.register("tempwarn")
@@ -420,8 +413,7 @@ public final class SanctionCommands extends CommandSupport {
                     Sanction applied = sanctions.apply(new SanctionService.Request(
                             com.admintools.model.PunishmentType.WARN, uuid, display, null, reason(args, 2),
                             duration, staffUuid(sender), staffName(sender), silent, null, null));
-                    plugin.getMessages().send(sender, "sanctions.applied", "id", applied.id(), "player", display,
-                            "type", applied.type().display(), "duration", sanctions.durationText(duration));
+                    confirmApplied(sender, applied, display, duration);
                 });
 
         registry.register("kick")
@@ -444,8 +436,7 @@ public final class SanctionCommands extends CommandSupport {
                     Sanction applied = sanctions.apply(new SanctionService.Request(
                             com.admintools.model.PunishmentType.KICK, uuid, online.getName(), null, reason(args, 1),
                             TimeUtil.PERMANENT, staffUuid(sender), staffName(sender), silent, null, null));
-                    plugin.getMessages().send(sender, "sanctions.applied", "id", applied.id(), "player", online.getName(),
-                            "type", applied.type().display(), "duration", "-");
+                    confirmApplied(sender, applied, online.getName(), 0L);
                 });
     }
 

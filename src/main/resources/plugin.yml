@@ -157,6 +157,10 @@ commands:
     aliases: [smode, staffm]
     permission: admintools.staff.mode
     usage: /staffmode [jugador|on|off]
+  spectate:
+    description: 'Espectador de vigilancia con tiempo limitado y recarga'
+    permission: admintools.staff.mode
+    usage: /spectate [jugador]
   follow:
     description: 'Sigue a un jugador (teletransporte continuo)'
     permission: admintools.staff.follow
@@ -399,6 +403,7 @@ permissions:
       admintools.chat.slowmode: true
       admintools.investigate.alts: true
       admintools.investigate.case: true
+      admintools.investigate.inspect: true
       admintools.investigate.snapshot: true
       admintools.jail.manage: true
       admintools.rollback.view: true
@@ -414,6 +419,8 @@ permissions:
       admintools.sanction.ipmute: true
       admintools.sanction.rollback: true
       admintools.staff.mode.others: true
+      admintools.staff.vanish.others: true
+      admintools.staff.spectate.others: true
       admintools.chat.muteall: true
       admintools.chat.filter.bypass: true
       admintools.chat.cooldown.bypass: true
@@ -507,6 +514,9 @@ permissions:
   admintools.staff.vanish.see:
     description: 'Ver a los jugadores en vanish'
     default: op
+  admintools.staff.vanish.others:
+    description: 'Activar o quitar el vanish de otro miembro del staff'
+    default: op
   admintools.staff.freeze:
     description: 'Congelar y descongelar jugadores'
     default: op
@@ -530,6 +540,9 @@ permissions:
     default: op
   admintools.staff.mode.others:
     description: 'Activar o desactivar el modo staff de otro jugador'
+    default: op
+  admintools.staff.spectate.others:
+    description: 'Cortar la sesión de espectador de otro jugador'
     default: op
   admintools.staff.seen:
     description: 'Consultar última conexión y tiempo jugado'
@@ -579,6 +592,9 @@ permissions:
   admintools.chat.cooldown.bypass:
     description: 'Ignorar el cooldown de chat'
     default: false
+  admintools.investigate.inspect:
+    description: 'Usar /at inspect (inspección de CoreProtect)'
+    default: op
   admintools.investigate.check:
     description: 'Ficha unificada de jugador'
     default: op

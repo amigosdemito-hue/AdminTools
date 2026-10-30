@@ -52,6 +52,7 @@ public final class RootCommand extends CommandSupport {
 
     private String commandDescription(String name) {
         return switch (name) {
+            case "helper", "moderator", "admin" -> "Panel de herramientas del rango";
             case "ban", "tempban" -> "Banea a un jugador";
             case "ipban" -> "Banea una IP";
             case "unban" -> "Levanta un ban";
@@ -128,6 +129,11 @@ public final class RootCommand extends CommandSupport {
         line(sender, "Chat global", plugin.getChatService().muteAll() ? "<red>silenciado" : "<green>abierto");
         var integrations = plugin.getIntegrations().activeTexts();
         line(sender, "Integraciones", integrations.isEmpty() ? "-" : String.join(", ", integrations));
+        // Dónde acaba el registro de staff: sin esto, "no funciona" no decía nada.
+        line(sender, "Registro de staff", plugin.getStaffLog().usable()
+                ? "<green>ON <gray>· " + plugin.getSettings().staffActionLogTarget()
+                : (plugin.getSettings().staffActionLogDiscord()
+                        ? "<red>activado pero sin webhook" : "<gray>desactivado"));
         var data = plugin.getWatchdogService().snapshot();
         plugin.getMessages().sendRaw(sender, "ops.watchdog-status",
                 "tps", data.get("tps"), "mspt", data.get("mspt"), "players", data.get("players"),
@@ -152,6 +158,9 @@ public final class RootCommand extends CommandSupport {
     }
 
     private void inspect(CommandSender sender, String[] args) throws CommandException {
+        // CoreProtect aplica sus propios permisos, pero el resto de /at los declara aquí:
+        // sin esta línea la suborden quedaba como la única sin control propio.
+        requirePermission(sender, "admintools.investigate.inspect");
         if (args.length < 2) {
             throw new CommandException(plugin.getMessages().raw("generic.usage",
                     "usage", "/at inspect <jugador> [radio] [tiempo]"));

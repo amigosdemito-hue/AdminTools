@@ -151,6 +151,7 @@ public final class PanelCatalog {
         add(staff, "cspy", Material.REDSTONE_TORCH, "admintools.staff.spy.command", "cspy");
         add(staff, "duty", Material.GOLDEN_SHOVEL, "admintools.staff.duty", "duty");
         add(staff, "staffmode", Material.CRAFTING_TABLE, "admintools.staff.mode", "staffmode");
+        add(staff, "spectate", Material.SPYGLASS, "admintools.staff.mode", "spectate");
         add(staff, "invsee", Material.CHEST, "admintools.staff.invsee",
                 "invsee {player}", required(PLAYER));
         add(staff, "enderchest", Material.ENDER_CHEST, "admintools.staff.enderchest",
