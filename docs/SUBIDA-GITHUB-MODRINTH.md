@@ -9,7 +9,7 @@ aún**: este documento es el preparado para que la subida sea un solo repaso.
 
 | Ítem | Estado |
 |---|---|
-| Repositorio git inicializado (`main`, 3 commits) | ✅ |
+| Repositorio git inicializado (`main`) | ✅ |
 | `.gitignore` (Gradle, IDE, `run/`, logs, base de datos, secretos) | ✅ |
 | Integración continua (`build.yml`: compila + pruebas en cada push) | ✅ |
 | `LICENSE` (todos los derechos reservados: público, no código abierto) | ✅ |
@@ -17,9 +17,10 @@ aún**: este documento es el preparado para que la subida sea un solo repaso.
 | `README.md` con instalación, rangos y configuración | ✅ |
 | Manual de rangos (`docs/ROL-*.md`) y comandos (`docs/COMANDOS-Y-PERMISOS.md`) | ✅ |
 | Tests (`./gradlew build`) | ✅ 43 pruebas |
-| Remoto de GitHub | ⏳ pendiente de la subida |
+| Remoto de GitHub | ✅ `github.com/amigosdemito-hue/AdminTools` (público), subido y CI en verde |
 | `release.yml` (jar adjunto en cada etiqueta) | ✅ listo, se dispara con `git tag` |
-| Proyecto publicado en Modrinth | ⏳ pendiente: slug `admintools` ocupado, se usa **`admintools-suite`** y falta un PAT válido |
+| Proyecto publicado en Modrinth | ⏳ pendiente: slug `admintools` ocupado → se usa **`admintools-suite`** y el `MODRINTH_TOKEN` actual devuelve 401 (hay que generar otro PAT) |
+| Release `v0.5.1` con el jar | ⏳ pendiente de la etiqueta (`git tag v0.5.1 && git push origin v0.5.1`) |
 
 ---
 
