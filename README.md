@@ -25,6 +25,8 @@ Estado: **plugin funcional y verificado** (compila, carga en Paper 26.1.2 y resp
 
 Detalle completo de cada función en [docs/LISTA-FUNCIONES.md](docs/LISTA-FUNCIONES.md) y la
 referencia de comandos y permisos en [docs/COMANDOS-Y-PERMISOS.md](docs/COMANDOS-Y-PERMISOS.md).
+El historial de versiones está en [CHANGELOG.md](CHANGELOG.md) y el material para publicar en
+[docs/SUBIDA-GITHUB-MODRINTH.md](docs/SUBIDA-GITHUB-MODRINTH.md).
 
 ---
 
@@ -32,7 +34,7 @@ referencia de comandos y permisos en [docs/COMANDOS-Y-PERMISOS.md](docs/COMANDOS
 
 ```bash
 ./gradlew build                       # compila y arma el jar final
-cp build/libs/AdminTools-0.3.3.jar servidor/plugins/   # el jar "gordo", no el -plain
+cp build/libs/AdminTools-0.5.0.jar servidor/plugins/   # el jar "gordo", no el -plain
 ```
 
 Al arrancar el servidor se crean solos:
@@ -53,8 +55,10 @@ Después de editar la config: `/at reload` (o reinicia el servidor si cambias el
 ```
 
 Cubren duraciones de sanción (parseo, ambigüedades y desbordes), texto y escape de MiniMessage,
-geometría del área de la cárcel y lectura del tipo de sanción guardado. Las integraciones con Paper
-(inventarios, menús, eventos) se siguen verificando arrancando un servidor real.
+geometría del área de la cárcel, lectura del tipo de sanción guardado y el **formato de las pantallas**
+que ve el jugador (ban, expulsión, silencio, cárcel, congelado, mantenimiento): se renderizan con
+MiniMessage en los dos idiomas y no pueden quedar con placeholders sin valor ni etiquetas sueltas.
+Las integraciones con Paper (inventarios, menús, eventos) se siguen verificando arrancando un servidor real.
 
 ### Si vienes de la versión anterior (ServerAdmin)
 
@@ -85,7 +89,7 @@ Los permisos vienen declarados en `plugin.yml` con sus hijos ya armados:
 
 - **helper** — warn/tempwarn, mute temporal, kick, vanish, freeze, tp, follow, playtime, staff chat, reportes, `/chatlog`, `/check`
 - **moderador** — todo lo del helper + bans temporales, mute permanente, modo staff, plantillas, escaleras, espías, invsee/enderchest, utilidades, `/alts`, copias de inventario
-- **admin** — todo + IP-ban, IP-mute, bans/mutes permanentes, reversión de sanciones, muteall, mantenimiento, reinicio, backups, auditoría, recarga, restauración de inventarios
+- **admin** — todo + IP-ban, IP-mute, bans/mutes permanentes, reversión de sanciones, muteall, mantenimiento, reinicio, backups, auditoría, recarga, restauración de inventarios, vanish y espectador sobre otros miembros del staff
 
 Cada rango tiene además su panel: `/helper`, `/moderator` y `/admin` abren una interfaz con **todas
 las acciones que su permiso permite**, sin botones que no pueda usar. La interfaz se elige en
@@ -94,6 +98,12 @@ nativos de Bedrock cuando Floodgate está instalado. Con el inventario, los dato
 piden por chat y el mensaje no se difunde.
 
 `/at help` muestra exactamente los comandos que puede usar cada rango.
+
+Manual de cada rango, con sus permisos y su **protocolo de uso en un servidor semi-anárquico**:
+
+- [Helper — permisos y protocolo](docs/ROL-HELPER.md)
+- [Moderador — permisos y protocolo](docs/ROL-MODERADOR.md)
+- [Admin — permisos y protocolo](docs/ROL-ADMIN.md)
 
 ---
 
@@ -111,9 +121,153 @@ piden por chat y el mensaje no se difunde.
 | `watchdog.*` | umbrales de TPS/MSPT/RAM/disco y alertas (también a Discord) |
 | `restart.*`, `backups.*` | reinicios por horario y copias automáticas |
 | `discord.*` | webhook para alertas de sanciones, reportes y rendimiento |
+| `announcements.*` | anuncios públicos de sanciones (sin contar el registro de staff), con cuenta atrás |
 | `integrations.*` | activar/desactivar LuckPerms, CoreProtect, PlaceholderAPI y alertas de anticheat |
 
 El webhook de Discord es un secreto: déjalo en `config.yml` del servidor, no en el repositorio.
+
+### Si MySQL no conecta
+
+El plugin imprime en consola el motivo real y una pista, por ejemplo:
+
+```
+[AdminTools] Conectando a MySQL jdbc:mysql://localhost:3306/midb?... (usuario midb)
+[AdminTools] No pude conectar a la base de datos: Access denied for user 'midb'@'localhost' [SQLState 28000] [código 1045]
+  -> Acceso denegado: revisa usuario y contraseña, y que ese usuario tenga permisos sobre la base.
+```
+
+Causas habituales en un hosting: la base lleva el **prefijo del usuario** (`usuario_admintools`),
+el host debe ser el **interno** (`localhost`) porque el 3306 remoto suele estar cerrado, y el usuariodebe estar autorizado para conectarse desde la IP del servidor. Con TLS desactivado el plugin añade
+solo `allowPublicKeyRetrieval=true` a los parámetros, que MySQL 8+ necesita con `caching_sha2_password`.
+Pon `debug: true` para ver la traza completa del fallo.
+
+### Anuncios de sanciones
+
+Es un sistema aparte del **registro de staff**: aquel audita lo que hace cada rango en un canal privado,
+este publica la moderación en un canal abierto. Se configuran dos webhooks distintos (se pueden usar los
+dos a la vez):
+
+- `announcements.public-webhook` — la comunidad. El embed va **firmado por el jugador sancionado**, con
+  su nombre y la cabeza de su skin, y muestra el tipo (ban permanente, ban temporal, encarcelamiento,
+  silencio, congelamiento), la duración, el motivo, quién la emitió y el número de sanción.
+- `announcements.staff-webhook` — copia al canal del staff, **firmada por quien emitió la sanción** (su
+  nombre y su cabeza), para ver de un vistazo quién actuó.
+
+Si la sanción es temporal, el embed lleva un campo `Termina` con la fecha y una **cuenta atrás viva**
+(`<t:...:R>`, que Discord actualiza sola sin que el servidor envíe nada). Cuando llega a cero se publica
+un segundo embed, en los dos canales, anunciando el fin. Como los avisos de fin cuelgan de los mismos
+caminos que ya expiran sanciones y condenas (idempotentes), no se duplican tras un reinicio.
+
+Las cabezas se piden a `announcements.head-url` (`https://mc-heads.net/avatar/{uuid}/128` por defecto);
+admite `{uuid}` y `{name}`, así que funciona también con nombres sancionados antes de entrar y con
+jugadores de Bedrock.
+
+### Reportes en Discord
+
+`/report` avisa en el juego y además manda un embed al canal privado del staff, con la cabeza del
+reportado, la de quien reporta (salvo con `reports.anonymous`), el motivo, la fecha y el ID. El destino
+se toma, en este orden, de `reports.discord-webhook`, del canal de staff de los anuncios y del webhook
+general; así sale de fábrica sin configurar nada nuevo si ya tienes canal de staff.
+
+### Dónde va cada webhook
+
+Cada canal de Discord necesita **su propio** webhook (no se puede publicar en un canal con el enlace de
+otro). Se sacan igual: ajustes del canal → Integraciones → Webhooks → Nuevo webhook → Copiar URL.
+
+| Ajuste | Para qué | Si se deja vacío |
+|---|---|---|
+| `discord.webhook-url` | alertas del plugin: sanciones, reportes y rendimiento | no se envía ninguna alerta |
+| `reports.discord-webhook` | cola de `/report` (canal privado del staff) | usa `announcements.staff-webhook` y, si no, el general |
+| `announcements.public-webhook` | anuncios de sanciones para la comunidad | no se publica nada |
+| `announcements.staff-webhook` | copia de esos anuncios, firmada por quien sancionó | no se manda copia |
+| `staff.action-log.webhook` | registro de comandos del staff (helpers, mods y admins) | usa `announcements.staff-webhook` y, si no, el general |
+
+El registro cubre **todos** los comandos del staff, no sólo los del plugin: con `staff.action-log.all-commands`
+(activado por defecto) también se anotan `/give`, `/gamemode` o cualquier comando de EssentialsX y demás
+plugins. Lo interceptado se guarda además en la auditoría, así que se consulta con `/audit`.
+
+El registro de staff **no** depende de `discord.enabled` (ese interruptor es solo para las alertas):
+con su webhook puesto funciona aunque las alertas estén apagadas. Si activas el registro sin ningún
+webhook, el arranque lo dice en consola y `/at status` muestra «activado pero sin webhook».
+
+### ¿Webhooks o un bot único?
+
+Cada canal de Discord necesita su propio webhook: no existe forma de publicar en un canal con el
+enlace de otro, ni con un bot (un bot tendría que estar en el servidor con los *intents* activados,
+conectado al *gateway* y cargando una librería de varios megas dentro del jar). Por eso el plugin usa
+webhooks: cada canal cuesta un campo de texto y no añade dependencias ni conexiones permanentes. Los
+embeds llevan la identidad (nombre y cabeza) en el propio mensaje, así que el aspecto es el mismo que
+con un bot.
+
+### Letrero de arranque
+
+Al terminar de cargar, el plugin pinta un bloque con versión, servidor, almacenamiento, módulos,
+integraciones y estado. Se ve de un vistazo entre las líneas del servidor porque todo el marco sale en
+un solo evento de log (el prefijo `[AdminTools]` aparece una vez y el dibujo queda alineado):
+
+```
+  ╔══════════════════════════════════════════════════════════════╗
+  ║                                                              ║
+  ║     ▄▀█ █▀▄ █▀▄▀█ █ █▄░█ ▀█▀ █▀█ █▀█ █░░ █▀                  ║
+  ║     █▀█ █▄▀ █░▀░█ █ █░▀█ ░█░ █▄█ █▄█ █▄▄ ▄█                  ║
+  ║                                                              ║
+  ║          ADMINISTRACIÓN · SANCIONES · CÁRCEL · STAFF         ║
+  ╟──────────────────────────────────────────────────────────────╢
+  ║  Versión        0.5.2 · Paper 26.1.2                         ║
+  ║  Servidor       MiServidor                                   ║
+  ║  Datos          SQLite · data.db                             ║
+  ║  Idioma         es · messages_es.yml                         ║
+  ║  Comandos       71 disponibles                               ║
+  ║  Paneles        3 rangos · 148 acciones · auto               ║
+  ║  Cárcel         2 celdas · 1 preso                           ║
+  ║  Integraciones  LuckPerms, Discord (webhook)                 ║
+  ║  Discord        alertas OFF · anuncios ON · staff-log ON     ║
+  ║  Estado         operativo                                    ║
+  ║  Arranque       1204 ms                                      ║
+  ║  Ayuda          /at help · /helper · /moderator · /admin     ║
+  ╚══════════════════════════════════════════════════════════════╝
+```
+
+El logo lleva un degradado cian → verde con colores ANSI de 256 colores, que Paper y las consolas de
+los paneles de hosting interpretan directamente. Dos opciones en `config.yml`:
+
+```yml
+console:
+  banner: true      # false = arranque discreto
+  color: auto       # auto | always | never
+```
+
+`auto` usa color salvo que la consola no lo soporte (`NO_COLOR`, `terminal.ansi=false` o una consola de
+Windows sin JLine). El archivo `logs/latest.log` sale siempre sin códigos de escape: Paper los recorta al
+escribir el archivo, así que el log queda legible para `grep`.
+
+### Mensajes y pantallas
+
+El diseño de los mensajes vive en `messages_es.yml` / `messages_en.yml` (MiniMessage), así que se puede
+cambiar todo —colores, textos, incluso el aspecto de la pantalla de ban— sin tocar el jar. La identidad
+visual es una barra `▏` con el canal (`SANCIÓN`, `CÁRCEL`, `SANCIONES`, `FIN`…) y columnas separadas por
+`│`; las pantallas completas (ban, expulsión, cárcel, congelado, mantenimiento) van enmarcadas y con los
+datos alineados:
+
+```
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+ACCESO DENEGADO
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+Sanción    » #42
+Tipo       » Ban
+Motivo     » Uso de clientes no permitidos (cheating)
+Expira     » 30 días
+Servidor   » MiServidor
+
+Si crees que es un error, apela la sanción
+en nuestro Discord.
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+```
+
+Cada archivo lleva `messages-version`. Cuando una actualización cambia el formato, el archivo de tu
+carpeta de datos se **regenera** con el diseño nuevo y tus textos quedan guardados al lado como
+`messages_es.yml.v1.bak`; si lo habías personalizado y quieres conservarlo, sube `messages-version`
+a mano y el plugin dejará de tocarlo.
 
 ### Seguridad de los mensajes
 

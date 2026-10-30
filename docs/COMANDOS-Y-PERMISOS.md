@@ -69,11 +69,12 @@ para dejarlo.
 
 | Comando | Uso | Permiso | Rango |
 |---|---|---|---|
-| `/vanish` | `/vanish [jugador]` | `admintools.staff.vanish` (+`.see`) | helper |
+| `/vanish` | `/vanish [jugador]` | `admintools.staff.vanish` (+`.see`; `.others` para otros) | helper |
 | `/staffmode` | `/staffmode [jugador\|on\|off]` | `admintools.staff.mode` (+`.others`) | moderador |
+| `/spectate` | `/spectate [jugador]` | `admintools.staff.mode` (+`.others` para cortar la de otro) | moderador |
 | `/follow` | `/follow <jugador\|stop>` | `admintools.staff.follow` | helper |
 | `/playtime` | `/playtime [jugador]` | `admintools.staff.seen` | helper |
-| `/freeze` | `/freeze <jugador>` | `admintools.staff.freeze` | helper |
+| `/freeze` | `/freeze <jugador> [motivo]` | `admintools.staff.freeze` | helper |
 | `/staffchat` | `/staffchat [mensaje]` (sin argumentos alterna el canal; la consola puede escribir) | `admintools.staff.staffchat` | helper |
 | `/spy` | `/spy` (mensajes privados) | `admintools.staff.spy` | moderador |
 | `/cspy` | `/cspy` (comandos ejecutados; nunca muestra `/login`, `/register`, correo ni 2FA) | `admintools.staff.spy.command` | moderador |
@@ -107,7 +108,7 @@ Clic en la cabeza te teletransporta por el mismo camino que `/tp`, así que resp
 
 | Comando | Uso | Permiso | Rango |
 |---|---|---|---|
-| `/report` | `/report <jugador> <motivo>` | `admintools.report` (**todos**) | jugador |
+| `/report` | `/report <jugador> <motivo>` (además del aviso en el juego, llega a `reports.discord-webhook`) | `admintools.report` (**todos**) | jugador |
 | `/reports` | `/reports [claim\|resolve\|reject\|info] [id] [nota]` | `admintools.report.staff` | helper |
 | `/chatlog` | `/chatlog <jugador> [cantidad]` | `admintools.chat.log` | helper |
 | `/clearchat` | `/clearchat [líneas]` | `admintools.chat.clear` | moderador |
@@ -130,8 +131,8 @@ devolución a la posición original y tiempo que sólo corre mientras el preso e
 | `/unjail` | `/unjail <jugador> [motivo]` | `admintools.jail.use` | helper |
 | `/jailtime` | `/jailtime [jugador]` (sin argumentos: la tuya, sin permiso) | `admintools.jail.view` | todos / helper |
 | `/jaillist` | `/jaillist` | `admintools.jail.view` | helper |
-| `/setjail` | `/setjail <nombre> [radio]` | `admintools.jail.manage` | admin |
-| `/deljail` | `/deljail <nombre>` | `admintools.jail.manage` | admin |
+| `/setjail` | `/setjail <nombre> [radio]` | `admintools.jail.manage` | moderador |
+| `/deljail` | `/deljail <nombre>` | `admintools.jail.manage` | moderador |
 | `/jails` | `/jails` | `admintools.jail.view` | helper |
 | `/jailtp` | `/jailtp <jugador>` | `admintools.jail.use` | helper |
 | `/jailimport` | `/jailimport [ruta\|xjail] [--dry]` | `admintools.jail.import` | admin |
@@ -172,8 +173,8 @@ espacio y borrado de copias.
 |---|---|---|---|
 | `/rollback` | `/rollback` (menú de jugadores) · `/rollback <jugador> [página]` | `admintools.rollback.view` | moderador |
 | `/rollback` | `/rollback <jugador> #id` (menú de la copia) | `admintools.rollback.view` | moderador |
-| `/rollback` | `/rollback <jugador> #id confirm [items\|ender\|position\|stats\|all]` | `admintools.rollback.restore` | admin |
-| `/rollback` | `/rollback <jugador> #id delete` · borrar desde el menú | `admintools.rollback.restore` | admin |
+| `/rollback` | `/rollback <jugador> #id confirm [items\|ender\|position\|stats\|all]` | `admintools.rollback.restore` | moderador |
+| `/rollback` | `/rollback <jugador> #id delete` · borrar desde el menú | `admintools.rollback.restore` | moderador |
 | `/rollback save` | `/rollback save <jugador>` | `admintools.rollback.save` | moderador |
 | `/rollback purge` | `/rollback purge <días>` | `admintools.rollback.purge` | admin |
 
@@ -199,6 +200,7 @@ espacio y borrado de copias.
 | `/watchdog` | `/watchdog [status\|test]` | `admintools.ops.watchdog` | admin |
 
 `/at inspect` y `/at rollback` son atajos a CoreProtect (requieren CoreProtect instalado y sus permisos).
+`/at inspect` pide además `admintools.investigate.inspect`, como el resto de subcomandos de `/at`.
 
 `/at acalert <jugador> <anticheat> <check> <vl> [detalles]` es el puente de anticheats: cualquier
 plugin que sepa ejecutar un comando al detectar un flag (Grim, Vulcan, Matrix, Spartan, Polar…) puede
@@ -251,6 +253,34 @@ aparece en `/check`, así que no hace falta copiar y pegar de la consola.
   - La apertura se hace con el jugador marcado como espectador solo durante esa llamada, que es lo que
     usa el servidor para no mover la tapa ni reproducir el sonido; el cliente no recibe ningún paquete
     de cambio de modo y el staff sigue con su modo de juego, su vuelo y sus efectos intactos.
+
+- **Espectador de vigilancia (`/spectate` o el visor de la hotbar del modo staff)** pone al staff en el
+  espectador **de verdad**: atraviesa bloques, no puede tocar nada y los demás no lo ven. No es una
+  imitación del vanish, así que no se le aplican los contenedores silenciosos ni el brillo por rango, y
+  mientras dura **pierde la barra rápida** (el espectador no la muestra). Por eso el tiempo es corto:
+  - **Duración y recarga:** `staff.spectate.seconds` (300 s = 5 min) y `staff.spectate.cooldown-seconds`
+    (900 s = 15 min). Al agotarse el tiempo se sale solo y avisa; `/spectate` sale antes de tiempo.
+  - **Persistencia:** la sesión y la recarga se guardan en `plugins/AdminTools/spectate.yml`. Si el
+    servidor se cae con alguien dentro, al volver a entrar se le devuelve su modo de juego y la recarga
+    se respeta igual.
+  - **No sobrevive al modo staff:** al salir de `/staffmode` se cierra la sesión y se devuelve el modo.
+  - **Limitación del cliente:** en el espectador vanilla el cuerpo no se mantiene. Para quien no es
+    espectador eres invisible; para otro espectador apareces como una cabeza flotante. No hay paquete
+    que separe «colisión de espectador» de «modelo visible»: es una regla del cliente, no del plugin.
+
+- **Registro de acciones del staff en Discord** (`staff.action-log.discord: true`, con el webhook de
+  `staff.action-log.webhook`, o `announcements.staff-webhook`, o el general de `integrations.discord`, en
+  ese orden; `/at status` dice de cuál se está tomando): anota cada comando y cada herramienta que usen
+  los jugadores con rango
+  `helper`, `moderator` o `admin`, en un mensaje agrupado cada 3 segundos para no chocar con el límite de
+  envíos de Discord. Las contraseñas, correos y dobles factores se registran sin argumentos, y los
+  motivos se limpian de menciones (`@everyone`) y de marcado. La consola no entra en este registro.
+  - **No sólo los comandos del plugin.** Con `staff.action-log.all-commands: true` (por defecto) también se
+    anotan los que ejecuta el staff desde cualquier otro sitio: `/give`, `/gamemode`, `/tp`, `/msg`, los de
+    EssentialsX, WorldEdit, etc. Se escucha el comando antes de que lo reciba nadie, así que no hay que
+    envolver ni parchear los otros plugins, y los alias (`/at`, `/gm`) cuentan como propios para no
+    duplicar líneas. Todo lo interceptado se guarda además en la auditoría de la base, así que aparece en
+    `/audit` aunque no haya Discord configurado.
   - Se abren así **todos** los contenedores con interfaz: cofre, cofre trampa, barril, todos los shulkers,
     horno, alto horno, ahumador, tolva, dispensador, dropper, alambique, crafter, mesa de libros, estantería
     tallada, estantes, lectern, enderchest, mesa de trabajo, encantamientos, los tres yunques, afiladora,
@@ -272,6 +302,7 @@ aparece en `/check`, así que no hace falta copiar y pegar de la consola.
     que no tienen interfaz propia y se usan con un clic normal.
 - **`/freeze`** bloquea el movimiento pero **deja girar la cámara**, para que el staff pueda hablar con el
   jugador congelado; también bloquea clics de inventario, dropeo de objetos y comandos (salvo `/report`).
+  El motivo es opcional: se anota en la auditoría y viaja al anuncio de Discord.
 - **`/invsee` y `/enderchest`** se abren en modo lectura salvo que se tenga el permiso `.modify`
   correspondiente a esa vista concreta.
 - **`/cspy`** omite comandos sensibles (`/login`, `/register`, `/email`, 2FA...) para no filtrar contraseñas.
@@ -287,6 +318,9 @@ aparece en `/check`, así que no hace falta copiar y pegar de la consola.
 | `admintools.sanction.ipmute` | silenciar IPs | op |
 | `admintools.staff.follow` | seguir a un jugador con `/follow` | op |
 | `admintools.staff.mode` / `.others` | modo staff propio / de otros | op |
+| `admintools.staff.vanish.others` | activar o quitar el vanish a otro miembro del staff | op |
+| `admintools.staff.spectate.others` | cortar la sesión de espectador de otro jugador | op |
+| `admintools.investigate.inspect` | usar `/at inspect` | op |
 | `admintools.staff.limit.bypass` | ignora el límite de acciones por minuto | false |
 | `admintools.anticheat.report` | enviar flags por `/at acalert` | op |
 | `admintools.exempt.freeze` | no se puede congelar | false |
