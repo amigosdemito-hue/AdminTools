@@ -6,6 +6,7 @@ import com.admintools.model.Sanction;
 import com.admintools.model.TemplateSpec;
 import com.admintools.service.SanctionService;
 import com.admintools.util.TimeUtil;
+import com.admintools.util.Util;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -157,7 +158,7 @@ public final class SanctionCommands extends CommandSupport {
                         ip = input;
                         uuid = null;
                         display = input;
-                    } else if (input.matches("[A-Za-z0-9_]{1,16}")) {
+                    } else if (Util.isPlayerName(input)) {
                         // Parece un nombre de jugador que no conocemos en este servidor.
                         throw new CommandException(plugin.getMessages().raw("generic.player-not-found",
                                 "player", input));
@@ -314,7 +315,7 @@ public final class SanctionCommands extends CommandSupport {
                     } else if (input.matches("\\d{1,3}(\\.\\d{1,3}){3}")) {
                         ip = input;
                         display = input;
-                    } else if (input.matches("[A-Za-z0-9_]{1,16}")) {
+                    } else if (Util.isPlayerName(input)) {
                         throw new CommandException(plugin.getMessages().raw("generic.player-not-found",
                                 "player", input));
                     } else {

@@ -9,6 +9,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Nameable;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.Bisected;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Openable;
+import org.bukkit.block.data.type.Door;
 import org.bukkit.entity.ChestBoat;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.minecart.HopperMinecart;
@@ -37,6 +42,7 @@ import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -181,6 +187,107 @@ public final class StaffListener implements Listener {
             default -> block.getState(false) instanceof BlockInventoryHolder holder
                     && holder.getInventory() != null;
         };
+    }
+
+    /** En vanish, ¿hay que silenciar las acciones que suenan (puertas, botones, comer)? */
+    private boolean silentActions(Player player) {
+        return plugin.getStaffState().vanished(player.getUniqueId())
+                && plugin.getSettings().vanishSilentActions();
+    }
+
+    /**
+     * Abrir puertas, trampillas, vallas con puerta, botones y palancas suena para todos los
+     * que están cerca: es el rastro más fácil de seguir de un staff en vanish.
+     *
+     * <p>En puertas, trampillas y vallas con puerta se cancela la interacción y se acciona el
+     * bloque por API, que sólo manda el cambio de estado y ningún sonido: el staff sigue
+     * pudiendo abrir y cerrar, y los que están cerca ven el bloque moverse pero no oyen
+     * nada. En botones y palancas se cancela sin más: accionarlos por API los dejaría
+     * pulsados, porque el temporizador que los suelta lo pone el propio uso del bloque. Las
+     * puertas y trampillas de hierro quedan fuera a propósito: abrirlas por API dejaría
+     * entrar en zonas cerradas que el jugador no tiene por qué poder abrir.</p>
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSilentOpenable(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || !silentActions(event.getPlayer())) {
+            return;
+        }
+        Block block = event.getClickedBlock();
+        // Otra protección (WorldGuard y similares) puede denegar el uso sin cancelar nada.
+        if (block == null || isIronDoor(block.getType())
+                || event.useInteractedBlock() == org.bukkit.event.Event.Result.DENY) {
+            return;
+        }
+        BlockData data = block.getBlockData();
+        event.setCancelled(true);
+        if (data instanceof Door door) {
+            toggleDoor(block, door);
+        } else if (data instanceof Openable openable) {
+            openable.setOpen(!openable.isOpen());
+            block.setBlockData(openable, false);
+        }
+        // Un Switch (botón o palanca) se queda tal cual: basta con cancelar para que no
+        // suene. Accionarlo por API dejaría el botón pulsado para siempre, porque el
+        // temporizador que lo suelta lo pone el uso normal del bloque.
+    }
+
+    /** Puerta de madera o de hierro (y sus trampillas), que no se abren a mano. */
+    private boolean isIronDoor(Material type) {
+        return type == Material.IRON_DOOR || type == Material.IRON_TRAPDOOR;
+    }
+
+    /**
+     * Una puerta son dos bloques y cada mitad guarda su propio "abierta": hay que cambiar
+     * las dos o la puerta se queda a medias y se puede ver el hueco.
+     */
+    private void toggleDoor(Block block, Door door) {
+        boolean open = !door.isOpen();
+        door.setOpen(open);
+        block.setBlockData(door, false);
+        Block other = block.getRelative(door.getHalf() == Bisected.Half.BOTTOM
+                ? BlockFace.UP : BlockFace.DOWN);
+        if (other.getBlockData() instanceof Door half) {
+            half.setOpen(open);
+            other.setBlockData(half, false);
+        }
+    }
+
+    /**
+     * En vanish no se come ni se bebe: el sonido de comer lo genera el cliente y no hay
+     * forma de silenciarlo desde el servidor, así que la única manera de que no suene es
+     * no dejar empezar. Se avisa en la barra de acción para no llenar el chat.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSilentConsume(PlayerInteractEvent event) {
+        if (event.getAction() == Action.PHYSICAL || !silentActions(event.getPlayer())) {
+            return;
+        }
+        ItemStack item = event.getItem();
+        if (item == null || !consumable(item.getType())) {
+            return;
+        }
+        event.setCancelled(true);
+        event.getPlayer().sendActionBar(plugin.getMessages().get("staff.vanish-silent-food"));
+    }
+
+    /** Comida, bebida y pociones: lo que el cliente convierte en sonido al consumirlo. */
+    private boolean consumable(Material type) {
+        return type.isEdible()
+                || type == Material.POTION
+                || type == Material.MILK_BUCKET
+                || type == Material.HONEY_BOTTLE
+                || type == Material.OMINOUS_BOTTLE;
+    }
+
+    /** Al reaparecer se pierden los efectos: el brillo del vanish se vuelve a aplicar. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onVanishRespawn(PlayerRespawnEvent event) {
+        Player player = event.getPlayer();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (player.isOnline()) {
+                plugin.getStaffState().reapplyGlow(player);
+            }
+        });
     }
 
     /**

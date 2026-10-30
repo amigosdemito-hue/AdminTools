@@ -19,8 +19,13 @@ public final class CoreProtectHook {
         this.coreProtect = Bukkit.getPluginManager().getPlugin("CoreProtect");
     }
 
+    /**
+     * ¿Se puede usar el puente? Exige el plugin instalado y la opción
+     * {@code integrations.coreprotect} activa; se consulta en cada llamada para
+     * que {@code /admintools reload} aplique el cambio sin reiniciar.
+     */
     public boolean installed() {
-        return coreProtect != null && coreProtect.isEnabled();
+        return coreProtect != null && coreProtect.isEnabled() && plugin.getSettings().hookCoreProtect();
     }
 
     public String version() {

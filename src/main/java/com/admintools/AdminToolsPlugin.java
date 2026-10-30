@@ -6,6 +6,7 @@ import com.admintools.command.CommandRegistry;
 import com.admintools.command.InvestigationCommands;
 import com.admintools.command.JailCommands;
 import com.admintools.command.OpsCommands;
+import com.admintools.command.PanelCommands;
 import com.admintools.command.RollbackCommands;
 import com.admintools.command.ReportCommands;
 import com.admintools.command.RootCommand;
@@ -15,6 +16,7 @@ import com.admintools.command.UtilityCommands;
 import com.admintools.config.Messages;
 import com.admintools.config.Settings;
 import com.admintools.gui.RollbackGui;
+import com.admintools.gui.panel.PanelService;
 import com.admintools.integration.IntegrationManager;
 import com.admintools.listener.ChatListener;
 import com.admintools.listener.ConnectionListener;
@@ -25,6 +27,7 @@ import com.admintools.listener.StaffModeListener;
 import com.admintools.service.ActionLimiter;
 import com.admintools.service.AuditService;
 import com.admintools.service.BackupService;
+import com.admintools.service.ChatInputService;
 import com.admintools.service.ChatService;
 import com.admintools.service.ConfirmationService;
 import com.admintools.service.FollowService;
@@ -78,6 +81,8 @@ public final class AdminToolsPlugin extends JavaPlugin {
     private InventoryBackupService inventoryBackups;
     private RollbackGui rollbackGui;
     private RollbackListener rollbackListener;
+    private ChatInputService chatInput;
+    private PanelService panels;
     private WatchdogService watchdogService;
     private MaintenanceService maintenanceService;
     private RestartService restartService;
@@ -133,6 +138,8 @@ public final class AdminToolsPlugin extends JavaPlugin {
         retentionService = new RetentionService(this);
         confirmationService = new ConfirmationService(this);
         actionLimiter = new ActionLimiter(this);
+        chatInput = new ChatInputService(this);
+        panels = new PanelService(this, chatInput);
 
         // Integraciones opcionales
         integrations = new IntegrationManager(this);
@@ -151,6 +158,9 @@ public final class AdminToolsPlugin extends JavaPlugin {
         new JailCommands(this, registry);
         new RollbackCommands(this, registry);
         new OpsCommands(this, registry);
+        new PanelCommands(this, registry, panels);
+        // Un botón que apunte a un comando renombrado se canta en consola.
+        panels.validate(registry);
 
         // Algunos nombres (p. ej. /restart) ya los tenía el servidor: se recuperan
         // y, si hace falta, se redirigen hacia los manejadores del plugin.
@@ -169,6 +179,8 @@ public final class AdminToolsPlugin extends JavaPlugin {
         pluginManager.registerEvents(new ChatListener(this), this);
         pluginManager.registerEvents(new StaffListener(this), this);
         pluginManager.registerEvents(new StaffModeListener(this), this);
+        pluginManager.registerEvents(chatInput, this);
+        pluginManager.registerEvents(panels.inventory(), this);
 
         // Tareas periódicas
         sanctionService.refreshCache();
@@ -193,6 +205,10 @@ public final class AdminToolsPlugin extends JavaPlugin {
         getLogger().info("Vanish: contenedores silenciosos="
                 + (settings.vanishSilentContainers() ? "ON" : "OFF")
                 + " · recogida de ítems y XP=" + (settings.vanishPickup() ? "ON" : "OFF")
+                + " · acciones silenciosas=" + (settings.vanishSilentActions() ? "ON" : "OFF")
+                + " · brillo por rango=" + (settings.vanishGlow() ? "ON" : "OFF")
+                + " · verse entre invisibles="
+                + (settings.vanishSeeRequiresVanish() ? "SÓLO EN VANISH" : "CON PERMISO")
                 + " · apertura sin animación=" + (SpectatorOpen.available() ? "OK" : "NO DISPONIBLE"));
     }
 
@@ -332,6 +348,7 @@ public final class AdminToolsPlugin extends JavaPlugin {
     public InventoryBackupService getInventoryBackups() {
         return inventoryBackups;
     }
+
 
     public WatchdogService getWatchdogService() {
         return watchdogService;

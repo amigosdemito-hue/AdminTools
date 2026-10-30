@@ -8,6 +8,31 @@ subcomandos (`/reports claim`, `/snapshot save`...) y el flag `-s`, según el ar
 
 ## Comandos
 
+### Paneles por rango
+
+| Comando | Uso | Permiso | Rango |
+|---|---|---|---|
+| `/helper` | `/helper` | `admintools.helper` | helper |
+| `/moderator` | `/moderator` | `admintools.moderator` | moderador |
+| `/admin` | `/admin` | `admintools.admin` | admin |
+
+Los tres abren un panel con **todas las opciones que permite el rango** (acumulativo: moderador
+incluye lo del helper y admin lo de los dos). Cada botón ejecuta el comando real como el propio
+jugador, así que el panel no salta permisos, límites de acciones ni auditoría, y si un permiso
+cambia el botón aparece o desaparece solo.
+
+Tres interfaces, elegidas en `panel.ui`:
+
+| Valor | Java | Bedrock |
+|---|---|---|
+| `auto` (por defecto) | diálogo nativo 1.21.6+ | formulario nativo de Floodgate si está instalado; si no, diálogo Java |
+| `dialog` | diálogo nativo | diálogo Java (Geyser lo dibuja) |
+| `inventory` | menú de inventario | menú de inventario |
+
+Con la interfaz de inventario, los datos que falten (jugador, duración, motivo…) se piden por chat;
+la respuesta no se difunde y caduca a los `panel.chat-input-seconds` segundos. Escribe `cancelar`
+para dejarlo.
+
 ### Sanciones
 
 | Comando | Uso | Permiso | Rango |
@@ -111,6 +136,10 @@ devolución a la posición original y tiempo que sólo corre mientras el preso e
 | `/jailtp` | `/jailtp <jugador>` | `admintools.jail.use` | helper |
 | `/jailimport` | `/jailimport [ruta\|xjail] [--dry]` | `admintools.jail.import` | admin |
 
+- **Celda al azar:** `/jail` sin celda manda al preso a una celda al azar entre las que tienen mundo válido,
+  así que no acaba siempre en la misma. El mensaje de confirmación dice en cuál quedó. Con
+  `jail.random-cell: false` vuelve a usarse siempre `jail.default`; esa celda también es la reserva si no
+  hay ninguna válida entre las que elegir.
 - Un preso no rompe ni coloca bloques, no interactúa, no recibe ni hace daño, no usa perlas ni fruta del
   coro y sólo puede escribir en los comandos de `jail.allowed-commands` (más reportes y mensajes privados).
 - **Inventario**: al encarcelar se le guarda el inventario completo (36 espacios, armadura y mano secundaria) y
@@ -200,6 +229,21 @@ aparece en `/check`, así que no hace falta copiar y pegar de la consola.
     siguen abriéndose sin animación ni sonido, sin tener que escribir `/vanish` otra vez (al entrar le
     avisa por el chat de que el vanish sigue activo). También aguanta un reinicio del servidor o una
     recarga del plugin. Para apagarlo basta con `/vanish`.
+  - **Sólo los invisibles se ven entre sí:** al activar el vanish el staff desaparece también para el
+    resto del staff visible, así que un moderador que no está en vanish no se entera de que hay alguien
+    mirando. Dos miembros en vanish sí se ven (con el brillo del apartado siguiente) para coordinarse.
+    Con `staff.vanish-see-requires-vanish: false` vuelve el modelo antiguo, donde el permiso
+    `admintools.staff.vanish.see` basta aunque no estés invisible.
+  - **Brillo con el color del rango:** en vanish se aplica el efecto `GLOWING` y el color lo pone un
+    equipo del marcador de cada observador (el efecto siempre brilla en blanco): verde para helper,
+    amarillo para moderador y rojo para admin, ajustable en `staff.vanish-glow`. También sirve para
+    distinguir a un miembro del staff invisible de un jugador normal. Se reaplica al entrar y al
+    reaparecer, y se quita del marcador al salir del vanish o del servidor.
+  - **Acciones silenciosas:** en vanish las puertas, trampillas y vallas con puerta se abren sin sonido
+    (el bloque se acciona por API, sin sonido, y el staff sigue pudiendo pasar); botones y palancas no se
+    accionan, y no se puede comer ni beber, porque el sonido de comer lo genera el cliente y no hay forma
+    de silenciarlo desde el servidor. Las puertas y trampillas de hierro no se abren con esto. Se apaga
+    con `staff.vanish-silent-actions: false`.
   - **Sin invisibilidad fantasma:** al entrar, la visibilidad se reconcilia en los dos sentidos. Si el
     estado dice vanish, se vuelve a ocultar; si no, se vuelve a mostrar a todos. Evita el caso en el que
     el staff queda invisible para los clientes (que recuerdan por UUID a quién tienen oculto) mientras el

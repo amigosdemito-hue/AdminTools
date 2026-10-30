@@ -55,6 +55,15 @@ public final class Settings {
     private boolean staffModeBlockPickup;
     private boolean vanishPickup;
     private boolean vanishSilentContainers;
+    private boolean vanishSilentActions;
+    private boolean vanishSeeRequiresVanish;
+    private boolean vanishGlow;
+    private String vanishGlowHelper;
+    private String vanishGlowModerator;
+    private String vanishGlowAdmin;
+    private String panelUi;
+    private boolean panelBedrockForms;
+    private int panelChatSeconds;
     private Map<String, String> durationLimits;
     private boolean autoEscalateEnabled;
     private int autoEscalateWindowDays;
@@ -91,6 +100,7 @@ public final class Settings {
     private boolean altsNotifyStaff;
     private boolean jailEnabled;
     private String jailDefault;
+    private boolean jailRandomCell;
     private long jailDefaultDuration;
     private boolean jailReturnOnEscape;
     private boolean jailNotifyStaff;
@@ -200,6 +210,15 @@ public final class Settings {
         staffModeBlockPickup = bool("staff.mode.block-pickup", true);
         vanishPickup = bool("staff.vanish-pickup", false);
         vanishSilentContainers = bool("staff.vanish-silent-containers", true);
+        vanishSilentActions = bool("staff.vanish-silent-actions", true);
+        vanishSeeRequiresVanish = bool("staff.vanish-see-requires-vanish", true);
+        vanishGlow = bool("staff.vanish-glow.enabled", true);
+        vanishGlowHelper = str("staff.vanish-glow.helper", "green");
+        vanishGlowModerator = str("staff.vanish-glow.moderator", "yellow");
+        vanishGlowAdmin = str("staff.vanish-glow.admin", "red");
+        panelUi = normalisePanelUi(str("panel.ui", "auto"));
+        panelBedrockForms = bool("panel.bedrock-forms", true);
+        panelChatSeconds = Math.max(10, num("panel.chat-input-seconds", 60));
         durationLimits = readDurationLimits();
         autoEscalateEnabled = bool("sanctions.auto-escalate.enabled", true);
         autoEscalateWindowDays = num("sanctions.auto-escalate.window-days", 30);
@@ -240,6 +259,7 @@ public final class Settings {
 
         jailEnabled = bool("jail.enabled", true);
         jailDefault = str("jail.default", "spawn");
+        jailRandomCell = bool("jail.random-cell", true);
         jailDefaultDuration = duration(str("jail.default-duration", "permanent"), TimeUtil.PERMANENT);
         jailReturnOnEscape = bool("jail.return-on-escape", true);
         jailNotifyStaff = bool("jail.notify-staff", true);
@@ -461,10 +481,6 @@ public final class Settings {
         return language;
     }
 
-    public String storageType() {
-        return storageType;
-    }
-
     public boolean mysql() {
         return storageType.equals("mysql");
     }
@@ -547,6 +563,63 @@ public final class Settings {
         return vanishSilentContainers;
     }
 
+    /** ¿Se silencian en vanish las acciones con sonido (puertas, botones, comer)? */
+    public boolean vanishSilentActions() {
+        return vanishSilentActions;
+    }
+
+    /**
+     * ¿Sólo el staff en vanish ve a los demás en vanish?
+     *
+     * <p>En true (por defecto) la visibilidad es simétrica: quien está invisible ve a
+     * los invisibles, y quien no lo está no los ve aunque tenga
+     * {@code admintools.staff.vanish.see}. En false vuelve al modelo antiguo, donde
+     * ese permiso basta.</p>
+     */
+    public boolean vanishSeeRequiresVanish() {
+        return vanishSeeRequiresVanish;
+    }
+
+    /** ¿El staff en vanish brilla con el color de su rango? */
+    public boolean vanishGlow() {
+        return vanishGlow;
+    }
+
+    /** Color del brillo de un rango, tal cual viene en la config. */
+    public String vanishGlowColor(String rank) {
+        return switch (rank) {
+            case "admin" -> vanishGlowAdmin;
+            case "moderator" -> vanishGlowModerator;
+            default -> vanishGlowHelper;
+        };
+    }
+
+    /**
+     * Interfaz de los paneles: {@code auto}, {@code inventory} o {@code dialog}.
+     * Un valor desconocido cae en {@code auto} en vez de romper el panel.
+     */
+    public String panelUi() {
+        return panelUi;
+    }
+
+    /** ¿Los clientes Bedrock reciben formularios nativos cuando Floodgate está? */
+    public boolean panelBedrockForms() {
+        return panelBedrockForms;
+    }
+
+    /** Segundos que el panel espera una respuesta escrita en el chat. */
+    public int panelChatSeconds() {
+        return panelChatSeconds;
+    }
+
+    private static String normalisePanelUi(String raw) {
+        String value = raw == null ? "auto" : raw.trim().toLowerCase(Locale.ROOT);
+        return switch (value) {
+            case "inventory", "dialog", "auto" -> value;
+            default -> "auto";
+        };
+    }
+
     public Map<String, String> durationLimits() {
         return durationLimits;
     }
@@ -574,6 +647,15 @@ public final class Settings {
 
     public String jailDefault() {
         return jailDefault;
+    }
+
+    /**
+     * ¿Una condena sin celda explícita va a una celda al azar?
+     *
+     * <p>En false se vuelve al comportamiento anterior: siempre {@code jail.default}.</p>
+     */
+    public boolean jailRandomCell() {
+        return jailRandomCell;
     }
 
     /** Duración por defecto de una condena (TimeUtil.PERMANENT si no se configura). */

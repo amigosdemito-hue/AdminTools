@@ -20,6 +20,7 @@ Estado: **plugin funcional y verificado** (compila, carga en Paper 26.1.2 y resp
 | **Rollback** | copias automáticas (entrada, salida, muerte, cambio de mundo e intervalo), menús de jugadores → copias → contenido con armadura y mano secundaria, restauración selectiva, restauración de un solo espacio y borrado de copias con confirmación |
 | **Operación** | watchdog de TPS/MSPT/RAM/disco con alertas, modo mantenimiento, reinicio programado con avisos, copias de seguridad con rotación, auditoría de todo lo que hace el staff |
 | **Integraciones** | LuckPerms (rangos y prefijos), CoreProtect (lookup y rollback), Discord (alertas por webhook), PlaceholderAPI, Vault (saldo en la ficha del menú de staff, con o sin Vault instalado), puente de anticheats (`/at acalert`, con el último flag visible en `/check`) |
+| **Paneles por rango** | `/helper`, `/moderator` y `/admin` abren un panel con todas las opciones que permite el rango, con tres interfaces configurables: menú de inventario Bukkit, diálogo nativo de Minecraft (1.21.6+) y formularios nativos de Bedrock vía Floodgate |
 | **Anti-abuso** | jerarquía de rangos, límite de acciones por minuto, confirmación en comandos destructivos, decaimiento de warns |
 
 Detalle completo de cada función en [docs/LISTA-FUNCIONES.md](docs/LISTA-FUNCIONES.md) y la
@@ -85,6 +86,12 @@ Los permisos vienen declarados en `plugin.yml` con sus hijos ya armados:
 - **helper** — warn/tempwarn, mute temporal, kick, vanish, freeze, tp, follow, playtime, staff chat, reportes, `/chatlog`, `/check`
 - **moderador** — todo lo del helper + bans temporales, mute permanente, modo staff, plantillas, escaleras, espías, invsee/enderchest, utilidades, `/alts`, copias de inventario
 - **admin** — todo + IP-ban, IP-mute, bans/mutes permanentes, reversión de sanciones, muteall, mantenimiento, reinicio, backups, auditoría, recarga, restauración de inventarios
+
+Cada rango tiene además su panel: `/helper`, `/moderator` y `/admin` abren una interfaz con **todas
+las acciones que su permiso permite**, sin botones que no pueda usar. La interfaz se elige en
+`panel.ui` (`auto`, `dialog` o `inventory`): `auto` usa el diálogo nativo de Java y los formularios
+nativos de Bedrock cuando Floodgate está instalado. Con el inventario, los datos que falten se
+piden por chat y el mensaje no se difunde.
 
 `/at help` muestra exactamente los comandos que puede usar cada rango.
 

@@ -4,7 +4,6 @@ import com.admintools.AdminToolsPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -109,12 +108,5 @@ public final class AnticheatHook {
         }
         long cutoff = System.currentTimeMillis() - 7L * 86_400_000L;
         lastAlerts.entrySet().removeIf(entry -> entry.getValue().at() < cutoff);
-    }
-
-    /** Lista de anticheats conocidos pero no instalados (para /check). */
-    public List<String> missing() {
-        List<String> result = new ArrayList<>(KNOWN);
-        result.removeAll(installed);
-        return result;
     }
 }

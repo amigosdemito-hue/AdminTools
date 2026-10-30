@@ -146,6 +146,9 @@ public final class ConnectionListener implements Listener {
         String ip = player.getAddress() == null ? null : player.getAddress().getAddress().getHostAddress();
         plugin.getPlayerService().onQuit(player.getUniqueId(), player.getName(), ip);
         plugin.getSnapshotService().save(player, "Salida del servidor");
+        // Antes de olvidar el estado: el brillo del vanish deja entradas en los marcadores
+        // de los demás y hay que poder resolver el nombre.
+        plugin.getStaffState().onQuit(player);
         plugin.getStaffState().forget(player.getUniqueId());
         plugin.getIntegrations().luckPerms().forget(player.getUniqueId());
         plugin.getActionLimiter().forget(player.getUniqueId());

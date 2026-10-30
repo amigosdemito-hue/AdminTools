@@ -43,6 +43,12 @@ dependencies {
     // PlaceholderAPI: integración opcional (softdepend en plugin.yml).
     compileOnly(libs.placeholderapi)
 
+    // Floodgate + Cumulus: formularios nativos para clientes Bedrock. También
+    // compileOnly; si Floodgate no está instalado el panel usa diálogos Java y
+    // estas clases nunca se cargan (ver BedrockPanel).
+    compileOnly(libs.floodgate.api)
+    compileOnly(libs.cumulus)
+
     // Métricas anónimas de bStats (opcional: si se quita, borrar también
     // la línea de relocation de shadowJar y la clase de métricas).
     implementation(libs.bstats.bukkit)

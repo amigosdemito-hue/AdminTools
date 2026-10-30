@@ -19,6 +19,10 @@ bstats = "3.2.1"
 sqliteJdbc = "3.49.1.0"
 mysqlConnector = "9.2.0"
 placeholderApi = "2.11.6"
+# Floodgate (Bedrock) + Cumulus (formularios nativos). Sólo compileOnly: en
+# runtime las pone el plugin Floodgate; si no está, el panel usa diálogos Java.
+floodgate = "2.2.5-SNAPSHOT"
+cumulus = "1.1.2"
 
 # --- Pruebas ---
 # JUnit 5: pruebas de la lógica que no necesita un servidor (tiempos, textos,
@@ -36,6 +40,8 @@ bstats-bukkit = { module = "org.bstats:bstats-bukkit", version.ref = "bstats" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqliteJdbc" }
 mysql-connector = { module = "com.mysql:mysql-connector-j", version.ref = "mysqlConnector" }
 placeholderapi = { module = "me.clip:placeholderapi", version.ref = "placeholderApi" }
+floodgate-api = { module = "org.geysermc.floodgate:api", version.ref = "floodgate" }
+cumulus = { module = "org.geysermc.cumulus:cumulus", version.ref = "cumulus" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }
 

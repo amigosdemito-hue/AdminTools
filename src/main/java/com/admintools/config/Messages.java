@@ -32,6 +32,9 @@ public final class Messages {
     public void load(String language) {
         raw.clear();
         cache.clear();
+        // Tras una recarga el archivo puede traer claves nuevas: sin esto, una clave
+        // que faltó una vez nunca volvería a avisar de que sigue faltando.
+        missing.clear();
 
         String fileName = "messages_" + language + ".yml";
         File file = new File(plugin.getDataFolder(), fileName);
@@ -145,9 +148,5 @@ public final class Messages {
     /** Igual que {@link #sendRaw} pero eligiendo singular o plural según {@code count}. */
     public void sendRawCount(CommandSender sender, String baseKey, long count, Object... placeholders) {
         sender.sendMessage(get(plural(baseKey, count), placeholders));
-    }
-
-    public String prefix() {
-        return prefix;
     }
 }

@@ -2,16 +2,22 @@ package com.admintools.service;
 
 import com.admintools.AdminToolsPlugin;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -31,6 +37,13 @@ public final class StaffStateService {
     private final Set<UUID> staffChat = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<UUID> god = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<UUID, Location> back = new ConcurrentHashMap<>();
+    /** Para avisar una sola vez de un fallo al pintar el brillo. */
+    private final java.util.concurrent.atomic.AtomicBoolean glowErrorLogged =
+            new java.util.concurrent.atomic.AtomicBoolean();
+    /** Color del brillo ya resuelto por rango (la config no cambia en caliente). */
+    private final Map<String, NamedTextColor> glowColors = new ConcurrentHashMap<>();
+    /** A quién le hemos puesto nosotros la visibilidad por defecto en false. */
+    private final Set<UUID> hiddenByDefault = Collections.newSetFromMap(new ConcurrentHashMap<>());
     /** vista abierta -> permiso que hace falta para modificarla (invsee/enderchest) */
     private final Map<UUID, String> inventoryPermission = new ConcurrentHashMap<>();
     /** Dónde se guarda el vanish para que sobreviva a reconexiones y reinicios. */
@@ -84,14 +97,9 @@ public final class StaffStateService {
     public boolean toggleVanish(Player player) {
         UUID uuid = player.getUniqueId();
         if (vanished.remove(uuid)) {
-            // Vuelve a ser visible también para los que entren a partir de ahora.
-            player.setVisibleByDefault(true);
-            for (Player online : Bukkit.getOnlinePlayers()) {
-                if (!online.equals(player)) {
-                    online.showPlayer(plugin, player);
-                }
-            }
             saveVanish();
+            resyncVanish();
+            clearGlow(player);
             fakeJoin(player);
             plugin.getMessages().send(player, "staff.vanish-off");
             return false;
@@ -100,14 +108,73 @@ public final class StaffStateService {
         saveVanish();
         // Los que entren después tampoco deben verlo, sin depender del orden de los eventos.
         player.setVisibleByDefault(false);
-        for (Player online : Bukkit.getOnlinePlayers()) {
-            if (!online.equals(player) && !online.hasPermission("admintools.staff.vanish.see")) {
-                online.hidePlayer(plugin, player);
-            }
-        }
+        hiddenByDefault.add(uuid);
+        resyncVanish();
+        reapplyGlow(player);
         fakeQuit(player);
         plugin.getMessages().send(player, "staff.vanish-on");
         return true;
+    }
+
+    /**
+     * ¿Este observador ve a los que están en vanish?
+     *
+     * <p>Por defecto el vanish es simétrico: sólo el staff invisible ve a los invisibles,
+     * así dos miembros del staff desaparecidos siguen pudiendo coordinarse entre ellos
+     * mientras un moderador que no está en vanish no se entera. Con
+     * {@code staff.vanish-see-requires-vanish: false} basta con el permiso
+     * {@code admintools.staff.vanish.see}, que es el comportamiento antiguo.</p>
+     */
+    public boolean seesVanished(Player viewer) {
+        return seesThroughVanish(vanished(viewer.getUniqueId()),
+                viewer.hasPermission("admintools.staff.vanish.see"),
+                plugin.getSettings().vanishSeeRequiresVanish());
+    }
+
+    /**
+     * Regla de visibilidad, sin Bukkit: quien está en vanish ve a los invisibles, y quien no
+     * lo está sólo los ve si la configuración mantiene el permiso como excepción.
+     */
+    static boolean seesThroughVanish(boolean viewerVanished, boolean viewerHasSeePermission,
+                                     boolean seeRequiresVanish) {
+        if (viewerVanished) {
+            return true;
+        }
+        return !seeRequiresVanish && viewerHasSeePermission;
+    }
+
+    /**
+     * Recalcula quién ve a quién entre los conectados.
+     *
+     * <p>Se hace de una pasada completa en vez de sólo el que cambió porque la regla
+     * depende de los dos lados: al activar el vanish hay que ver a los demás invisibles, y
+     * al desactivarlo hay que dejar de verlos. Así no queda ningún par a medias.</p>
+     */
+    private void resyncVanish() {
+        for (Player target : Bukkit.getOnlinePlayers()) {
+            UUID id = target.getUniqueId();
+            boolean hidden = vanished(id);
+            // Los que entren a partir de ahora tampoco lo verán. Sólo se toca la
+            // visibilidad por defecto de quien hemos ocultado nosotros: ponerla en true al
+            // pasar por aquí desharía la de otro plugin que oculte a alguien por su cuenta.
+            if (hidden) {
+                target.setVisibleByDefault(false);
+                hiddenByDefault.add(id);
+            } else if (hiddenByDefault.remove(id)) {
+                target.setVisibleByDefault(true);
+            }
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                if (viewer.equals(target)) {
+                    continue;
+                }
+                if (hidden && !seesVanished(viewer)) {
+                    viewer.hidePlayer(plugin, target);
+                } else {
+                    viewer.showPlayer(plugin, target);
+                }
+            }
+        }
+        paintGlowSafely();
     }
 
     /**
@@ -120,37 +187,18 @@ public final class StaffStateService {
      * plugin abriría los contenedores en silencio.</p>
      */
     public void onJoin(Player joiner) {
-        UUID uuid = joiner.getUniqueId();
-        boolean invisible = vanished(uuid);
-        joiner.setVisibleByDefault(!invisible);
-        for (Player online : Bukkit.getOnlinePlayers()) {
-            if (online.equals(joiner)) {
-                continue;
-            }
-            if (invisible) {
-                if (!online.hasPermission("admintools.staff.vanish.see")) {
-                    online.hidePlayer(plugin, joiner);
-                }
-            } else {
-                online.showPlayer(plugin, joiner);
-            }
-        }
-        if (invisible) {
+        resyncVanish();
+        reapplyGlow(joiner);
+        if (vanished(joiner.getUniqueId())) {
             plugin.getMessages().send(joiner, "staff.vanish-restored");
-        }
-        for (Player online : Bukkit.getOnlinePlayers()) {
-            if (!online.equals(joiner) && vanished(online.getUniqueId())
-                    && !joiner.hasPermission("admintools.staff.vanish.see")) {
-                joiner.hidePlayer(plugin, online);
-            }
         }
     }
 
-    /** Mensaje falso de desconexión para el vanish (sólo lo ven los jugadores normales). */
+    /** Mensaje falso de desconexión para el vanish (sólo lo ven los que no lo tienen). */
     public void fakeQuit(Player player) {
         Component message = plugin.getMessages().get("staff.vanish-fake-quit", "player", player.getName());
         for (Player online : Bukkit.getOnlinePlayers()) {
-            if (!online.equals(player) && !online.hasPermission("admintools.staff.vanish.see")) {
+            if (!online.equals(player) && !seesVanished(online)) {
                 online.sendMessage(message);
             }
         }
@@ -160,11 +208,171 @@ public final class StaffStateService {
     public void fakeJoin(Player player) {
         Component message = plugin.getMessages().get("staff.vanish-fake-join", "player", player.getName());
         for (Player online : Bukkit.getOnlinePlayers()) {
-            if (!online.equals(player) && !online.hasPermission("admintools.staff.vanish.see")) {
+            if (!online.equals(player) && !seesVanished(online)) {
                 online.sendMessage(message);
             }
         }
     }
+    // ------------------------------------------------------------
+    //  Brillo por rango
+    // ------------------------------------------------------------
+
+    /** Rangos con color propio, de mayor a menor (el primero que coincida manda). */
+    private static final List<String> GLOW_RANKS = List.of("admin", "moderator", "helper");
+
+    /**
+     * Rango del jugador según sus permisos: el mismo orden que usan los paneles
+     * (admin &gt; moderador &gt; helper).
+     */
+    static String rankKey(boolean admin, boolean moderator) {
+        if (admin) {
+            return "admin";
+        }
+        return moderator ? "moderator" : "helper";
+    }
+
+    private static String rankKey(Player player) {
+        return rankKey(player.hasPermission("admintools.admin"),
+                player.hasPermission("admintools.moderator"));
+    }
+
+    private static String teamName(String rank) {
+        return "at_vanish_" + rank;
+    }
+
+    /**
+     * Vuelve a aplicar el brillo de un jugador en vanish.
+     *
+     * <p>Hace falta reaplicarlo al entrar, al reaparecer tras morir o si otro plugin
+     * limpia los efectos: el efecto no sobrevive a ninguna de las tres cosas.</p>
+     */
+    public void reapplyGlow(Player player) {
+        if (!vanished(player.getUniqueId()) || !plugin.getSettings().vanishGlow()) {
+            return;
+        }
+        player.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING,
+                PotionEffect.INFINITE_DURATION, 0, false, false, false));
+        paintGlowSafely();
+    }
+
+    /** Quita el brillo y su entrada de los marcadores de todos. */
+    private void clearGlow(Player player) {
+        player.removePotionEffect(PotionEffectType.GLOWING);
+        String name = player.getName();
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            removeEntry(viewer.getScoreboard(), name);
+        }
+    }
+
+    private void removeEntry(Scoreboard board, String name) {
+        for (String rank : GLOW_RANKS) {
+            Team team = board.getTeam(teamName(rank));
+            if (team != null && team.hasEntry(name)) {
+                team.removeEntry(name);
+            }
+        }
+    }
+
+    /**
+     * Reparte el brillo y su color.
+     *
+     * <p>El color se pone en un equipo del marcador porque el efecto GLOWING siempre
+     * brilla en blanco. Se escribe en el marcador de <b>cada observador</b> en vez de en el
+     * principal: muchos servidores dan a cada jugador un marcador propio (TAB, HUDs) y en
+     * ese caso el principal no pinta nada, y de paso el color sólo lo ve quien debe ver a
+     * los invisibles.</p>
+     */
+    /**
+     * Envuelve el pintado para que un marcador ajeno no pueda tumbar el vanish.
+     *
+     * <p>El brillo es cosmético; la invisibilidad no. Si pintar falla, se avisa una vez y se
+     * sigue: antes una excepción aquí interrumpía el toggle a medias, con el staff ya oculto
+     * pero sin mensaje de confirmación.</p>
+     */
+    private void paintGlowSafely() {
+        try {
+            paintGlow();
+        } catch (RuntimeException ex) {
+            if (glowErrorLogged.compareAndSet(false, true)) {
+                plugin.getLogger().warning("No pude pintar el brillo del vanish: " + ex.getMessage());
+            }
+        }
+    }
+
+    private void paintGlow() {
+        boolean enabled = plugin.getSettings().vanishGlow();
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            Scoreboard board = viewer.getScoreboard();
+            // Limpieza: entradas que ya no valen (salió del vanish, cambió de rango,
+            // se desconectó o este observador ya no debe verlas).
+            for (String rank : GLOW_RANKS) {
+                Team team = board.getTeam(teamName(rank));
+                if (team == null) {
+                    continue;
+                }
+                for (String entry : new ArrayList<>(team.getEntries())) {
+                    Player owner = Bukkit.getPlayerExact(entry);
+                    boolean keep = enabled
+                            && owner != null
+                            && vanished(owner.getUniqueId())
+                            && seesVanished(viewer)
+                            && rankKey(owner).equals(rank);
+                    if (!keep) {
+                        team.removeEntry(entry);
+                    }
+                }
+            }
+            if (!enabled || !seesVanished(viewer)) {
+                continue;
+            }
+            for (Player target : Bukkit.getOnlinePlayers()) {
+                if (!vanished(target.getUniqueId())) {
+                    continue;
+                }
+                Team team = ensureTeam(board, rankKey(target));
+                if (!team.hasEntry(target.getName())) {
+                    team.addEntry(target.getName());
+                }
+            }
+        }
+    }
+
+    private Team ensureTeam(Scoreboard board, String rank) {
+        Team team = board.getTeam(teamName(rank));
+        if (team == null) {
+            team = board.registerNewTeam(teamName(rank));
+        }
+        // No se compara con team.color(): lanza IllegalStateException mientras el equipo
+        // todavía no tiene color (el caso de uno recién creado), y eso rompía /vanish.
+        team.color(glowColor(rank));
+        return team;
+    }
+
+    /**
+     * Color configurado para el rango; si el valor no es un color válido, usa el de serie.
+     * Se resuelve una sola vez por rango para no repetir el aviso en cada refresco.
+     */
+    NamedTextColor glowColor(String rank) {
+        return glowColors.computeIfAbsent(rank, this::resolveGlowColor);
+    }
+
+    private NamedTextColor resolveGlowColor(String rank) {
+        String raw = plugin.getSettings().vanishGlowColor(rank);
+        if (raw != null) {
+            NamedTextColor named = NamedTextColor.NAMES.value(raw.toLowerCase(Locale.ROOT).trim());
+            if (named != null) {
+                return named;
+            }
+            plugin.getLogger().warning("Color de vanish desconocido ('" + raw
+                    + "'): se usa el de serie para el rango " + rank + ".");
+        }
+        return switch (rank) {
+            case "admin" -> NamedTextColor.RED;
+            case "moderator" -> NamedTextColor.YELLOW;
+            default -> NamedTextColor.GREEN;
+        };
+    }
+
     /** Aviso a todo el staff conectado + consola. */
     public void sendToStaff(Component message) {
         Bukkit.getConsoleSender().sendMessage(message);
@@ -278,11 +486,24 @@ public final class StaffStateService {
      * apaga con {@code /vanish}.</p>
      */
     public void forget(UUID uuid) {
+        hiddenByDefault.remove(uuid);
         back.remove(uuid);
         inventoryPermission.remove(uuid);
         socialSpy.remove(uuid);
         commandSpy.remove(uuid);
         staffChat.remove(uuid);
         god.remove(uuid);
+    }
+
+    /**
+     * Limpia lo que deja el brillo al salir del servidor.
+     *
+     * <p>El nombre no se puede resolver una vez desconectado: si estaba en vanish, su
+     * entrada quedaría para siempre en los equipos de los demás y un futuro jugador con
+     * ese mismo nombre heredaría el color de otro. Se llama con el jugador todavía en
+     * memoria ({@link org.bukkit.event.player.PlayerQuitEvent}).</p>
+     */
+    public void onQuit(Player player) {
+        clearGlow(player);
     }
 }

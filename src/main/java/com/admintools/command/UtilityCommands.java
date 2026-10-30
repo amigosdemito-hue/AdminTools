@@ -8,7 +8,6 @@ import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.util.List;
 import java.util.Locale;
 
 /** Utilidades del día a día del staff: curación, vuelo, modo de juego, teletransportes. */
@@ -220,10 +219,5 @@ public final class UtilityCommands extends CommandSupport {
         } catch (NumberFormatException ex) {
             throw new CommandException(plugin.getMessages().raw("generic.invalid-number", "input", input));
         }
-    }
-
-    /** Nombres de jugadores para autocompletado. */
-    public static List<String> names() {
-        return Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
     }
 }

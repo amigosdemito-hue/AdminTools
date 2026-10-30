@@ -65,10 +65,15 @@ public final class JailCommands extends CommandSupport {
                                     "input", args[index]));
                         }
                     }
-                    String jailName = plugin.getSettings().jailDefault();
+                    // Sin celda explícita se elige una al azar: así nadie acaba siempre en
+                    // la misma y un preso no puede aprenderse el recorrido de su celda.
+                    String jailName = null;
                     if (args.length > index && plugin.getJailService().jail(args[index]).isPresent()) {
                         jailName = args[index];
                         index++;
+                    }
+                    if (jailName == null) {
+                        jailName = pickCell();
                     }
                     if (jailName == null || jailName.isBlank() || plugin.getJailService().jail(jailName).isEmpty()) {
                         throw new CommandException(plugin.getMessages().raw(
@@ -368,6 +373,40 @@ public final class JailCommands extends CommandSupport {
         return plugin.getJailService().activeAll().stream()
                 .filter(sentence -> sentence.targetName().equalsIgnoreCase(name))
                 .findFirst();
+    }
+
+    /**
+     * Celda para una condena que no indica ninguna.
+     *
+     * <p>Al azar entre las que tienen mundo válido, porque una celda de un mundo borrado
+     * no puede recibir al preso. Quedan fuera las celdas de mundos inexistentes; si no
+     * queda ninguna se devuelve {@code jail.default} y el error lo da la comprobación de
+     * siempre, con el mensaje que ya existe.</p>
+     */
+    private String pickCell() {
+        if (!plugin.getSettings().jailRandomCell()) {
+            return plugin.getSettings().jailDefault();
+        }
+        List<String> usable = new ArrayList<>();
+        for (Jail jail : plugin.getJailService().jails()) {
+            if (jail.location() != null) {
+                usable.add(jail.name());
+            }
+        }
+        if (usable.isEmpty()) {
+            return plugin.getSettings().jailDefault();
+        }
+        return pickRandom(usable);
+    }
+
+    /**
+     * Una de las celdas de la lista, uniformemente.
+     *
+     * <p>Recibe una lista no vacía; el respaldo para la lista vacía lo hace
+     * {@link #pickCell()}, que es quien conoce la config.</p>
+     */
+    static String pickRandom(List<String> cells) {
+        return cells.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(cells.size()));
     }
 
     private List<String> jailNames() {

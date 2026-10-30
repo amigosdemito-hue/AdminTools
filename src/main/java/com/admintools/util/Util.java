@@ -3,11 +3,27 @@ package com.admintools.util;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /** Utilidades varias: paginación, unidades legibles y comparaciones de nombres. */
 public final class Util {
 
+    /**
+     * Nombre de jugador tal como lo guarda el servidor.
+     *
+     * <p>Los jugadores de Bedrock llegan a través de Floodgate con un prefijo de puntos
+     * (por defecto {@code .Steve}), así que el nombre válido no es sólo
+     * {@code [A-Za-z0-9_]}: exigir eso rechazaba a todos los de Bedrock en cualquier
+     * campo que validara el nombre.</p>
+     */
+    private static final Pattern PLAYER_NAME = Pattern.compile("\\.{0,2}[A-Za-z0-9_]{1,16}");
+
     private Util() {
+    }
+
+    /** ¿Es un nombre de jugador aceptable (Java o Bedrock con prefijo de Floodgate)? */
+    public static boolean isPlayerName(String name) {
+        return name != null && PLAYER_NAME.matcher(name.trim()).matches();
     }
 
     /** Recorta una lista para mostrar sólo la página pedida (1-based). */

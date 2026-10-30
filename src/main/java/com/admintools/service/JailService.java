@@ -263,8 +263,22 @@ public final class JailService {
                     "reason", Text.safe(reason == null || reason.isBlank() ? "-" : reason)));
             // Se le devuelve lo que tenía al entrar. Si estaba desconectado, la copia
             // queda pendiente y se le entrega la próxima vez que entre.
-            returnPending(player);
-            restoreGamemode(player);
+            try {
+                returnPending(player);
+            } catch (RuntimeException ex) {
+                // Un fallo al devolver el inventario no puede dejar al jugador sin su
+                // modo de juego: antes ese error se llevaba por delante la restauración.
+                plugin.getLogger().warning("No pude devolver el inventario a " + player.getName()
+                        + " al salir de la cárcel: " + ex.getMessage());
+            }
+            // El modo se devuelve en el tick siguiente, con el teletransporte ya
+            // aplicado: en Bedrock (Geyser) cambiar de mundo y de modo en el mismo tick
+            // deja al cliente con las habilidades del modo anterior.
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (player.isOnline()) {
+                    restoreGamemode(player);
+                }
+            });
         }
         if (plugin.getSettings().jailNotifyStaff()) {
             plugin.getStaffState().sendToStaff(plugin.getMessages().get("jail.released",
@@ -502,15 +516,14 @@ public final class JailService {
         }
         UUID uuid = player.getUniqueId();
         GameMode current = player.getGameMode();
-        // Se guarda siempre, incluso si ya era aventura: así al salir se le devuelve
-        // exactamente el modo que tenía y nadie se queda en aventura para siempre.
         if (!savedGameModes.containsKey(uuid)) {
-            savedGameModes.put(uuid, current);
+            GameMode original = originalMode(current, Bukkit.getDefaultGameMode());
+            savedGameModes.put(uuid, original);
             db.async(() -> {
                 db.update("DELETE FROM " + gamemodeTable + " WHERE uuid = ?", uuid.toString());
                 db.update("INSERT INTO " + gamemodeTable
                                 + " (uuid, gamemode, sentence_id, created_at) VALUES (?, ?, ?, ?)",
-                        uuid.toString(), current.name(), sentence.id(), System.currentTimeMillis());
+                        uuid.toString(), original.name(), sentence.id(), System.currentTimeMillis());
             });
         }
         if (current != GameMode.ADVENTURE) {
@@ -518,13 +531,46 @@ public final class JailService {
         }
     }
 
+    /**
+     * Modo que se guarda como "el de antes de la cárcel".
+     *
+     * <p>Nunca se guarda {@link GameMode#ADVENTURE}. Si el jugador ya estaba en aventura
+     * puede ser porque un encarcelamiento anterior lo dejó ahí (fila perdida, condena
+     * importada, recarga a mitad): guardar aventura como original lo dejaría sin poder
+     * romper bloques para siempre y cada nuevo encarcelamiento lo perpetuaría.</p>
+     */
+    static GameMode originalMode(GameMode current, GameMode serverDefault) {
+        return current == GameMode.ADVENTURE ? serverDefault : current;
+    }
+
+    /**
+     * Modo al que hay que devolver al preso al salir.
+     *
+     * <p>Con un modo guardado se respeta tal cual. Sin él (condena importada de xJail,
+     * fila que no llegó a escribirse, recarga justo al encarcelar) el jugador está en
+     * aventura porque lo puso el plugin, así que vuelve al modo por defecto del
+     * servidor en vez de quedarse atrapado sin poder romper bloques.</p>
+     */
+    static GameMode restoreTarget(GameMode saved, GameMode current, GameMode serverDefault) {
+        if (saved != null) {
+            return saved;
+        }
+        return current == GameMode.ADVENTURE ? serverDefault : current;
+    }
+
     /** Devuelve el modo de juego que tenía antes de entrar en la cárcel. */
     private void restoreGamemode(Player player) {
-        GameMode mode = savedGameModes.remove(player.getUniqueId());
+        GameMode saved = savedGameModes.remove(player.getUniqueId());
         db.async(() -> db.update("DELETE FROM " + gamemodeTable + " WHERE uuid = ?",
                 player.getUniqueId().toString()));
-        if (mode != null && player.getGameMode() != mode) {
-            player.setGameMode(mode);
+        GameMode current = player.getGameMode();
+        GameMode target = restoreTarget(saved, current, Bukkit.getDefaultGameMode());
+        if (target != null && target != current) {
+            player.setGameMode(target);
+            if (plugin.getSettings().debug()) {
+                plugin.getLogger().info("Cárcel: " + player.getName() + " vuelve a "
+                        + target.name() + (saved == null ? " (no había modo guardado)" : ""));
+            }
         }
     }
 

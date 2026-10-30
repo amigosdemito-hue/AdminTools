@@ -18,6 +18,9 @@ dependencyResolutionManagement {
         maven("https://repo.extendedclip.com/releases/") {
             name = "ExtendedClip" // PlaceholderAPI (integración opcional)
         }
+        maven("https://repo.opencollab.dev/main/") {
+            name = "OpenCollab" // Floodgate y Cumulus (formularios Bedrock, opcional)
+        }
     }
 }
 

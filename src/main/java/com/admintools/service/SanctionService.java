@@ -765,8 +765,12 @@ public final class SanctionService {
             }
             List<Sanction> expired = new ArrayList<>(due.size());
             for (Sanction sanction : due) {
+                // "AND active = 1" hace la baja idempotente: si dos pasadas de
+                // expireDue se solapan (una base lenta tarda más que el intervalo),
+                // sólo la primera actualiza y sólo se avisa una vez.
                 int updated = db.update("UPDATE " + table
-                                + " SET active = 0, lifted_name = ?, lifted_at = ?, lift_reason = ? WHERE id = ?",
+                                + " SET active = 0, lifted_name = ?, lifted_at = ?, lift_reason = ?"
+                                + " WHERE id = ? AND active = 1",
                         "Expiración automática", now, "Sanción expirada", sanction.id());
                 if (updated > 0) {
                     expired.add(sanction);

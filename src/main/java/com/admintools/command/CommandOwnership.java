@@ -84,11 +84,6 @@ public final class CommandOwnership implements Listener {
         }
     }
 
-    /** Etiquetas que el plugin declara pero no controla directamente. */
-    public Map<String, String> hijacked() {
-        return Map.copyOf(hijacked);
-    }
-
     // ------------------------------------------------------------
     //  Redirección por evento (jugadores y consola)
     // ------------------------------------------------------------

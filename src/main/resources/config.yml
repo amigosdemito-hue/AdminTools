@@ -278,6 +278,22 @@ staff:
   # trabajo, yunques, encantamientos, cortapiedras, telares, y barcas/vagonetas
   # con inventario. La interfaz la sigue viendo solo el staff.
   vanish-silent-containers: true
+  # Con vanish activo, silenciar también las acciones que suenan a los que están
+  # cerca (se delataría la posición): puertas, trampillas y vallas con puerta se
+  # abren sin sonido, botones y palancas no se accionan, y no se puede comer ni
+  # beber (el sonido de comer lo genera el cliente y no hay forma de silenciarlo).
+  vanish-silent-actions: true
+  # Sólo el staff en vanish ve a los demás en vanish. En false, basta con el
+  # permiso admintools.staff.vanish.see para verlos aunque no estés invisible.
+  vanish-see-requires-vanish: true
+  # Brillo del staff en vanish, con un color por rango. El efecto GLOWING se lo
+  # aplica el servidor y el color lo pone el equipo del marcador, así que se ve
+  # en Java y en Bedrock (Geyser). Colores: green, yellow, red, aqua, blue...
+  vanish-glow:
+    enabled: true
+    helper: green
+    moderator: yellow
+    admin: red
   # Límite de acciones sensibles (sanciones, limpiezas, restores...) por minuto
   # y por miembro del staff. Frena un ban masivo desde una cuenta comprometida.
   # Quien tenga admintools.staff.limit.bypass se lo salta.
@@ -297,7 +313,11 @@ staff:
 # ------------------------------------------------------------
 jail:
   enabled: true
-  # Celda que se usa cuando /jail no indica una y no hay otra mejor.
+  # /jail sin celda manda al preso a una celda al azar entre las que tienen mundo
+  # válido, para que no acabe siempre en la misma. En false se usa "default".
+  random-cell: true
+  # Celda de reserva para cuando no se puede elegir al azar (sin celdas válidas) y
+  # también la celda fija si random-cell es false.
   default: "spawn"
   # Duración por defecto de una condena: "permanent" o 30m, 2h, 7d...
   default-duration: "permanent"
@@ -353,6 +373,22 @@ rollback:
     manual: 20
   # Copias por página en /rollback <jugador>
   page-size: 8
+
+# ------------------------------------------------------------
+#  Paneles por rango (/helper, /moderator, /admin)
+# ------------------------------------------------------------
+panel:
+  # Interfaz de los paneles.
+  #   auto      = diálogos nativos en Java y formularios Bedrock si hay Floodgate
+  #   inventory = menú de inventario Bukkit (el clásico; funciona en todas partes)
+  #   dialog    = diálogos de Minecraft 1.21.6+ también para Bedrock (vía Geyser)
+  ui: auto
+  # Cuando el jugador entra desde Bedrock y Floodgate está instalado, usar sus
+  # formularios nativos en lugar del diálogo Java.
+  bedrock-forms: true
+  # Segundos que el panel espera a que el staff escriba un dato por chat
+  # (sólo en la interfaz de inventario).
+  chat-input-seconds: 60
 
 # ------------------------------------------------------------
 #  Integraciones (se activan solas si el plugin está instalado)

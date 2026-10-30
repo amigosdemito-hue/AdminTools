@@ -31,6 +31,20 @@ commands:
     aliases: [at, atool]
     usage: /admintools help
 
+  # ---------- paneles por rango ----------
+  helper:
+    description: 'Abre el panel del rango helper (sólo sus opciones)'
+    permission: admintools.helper
+    usage: /helper
+  moderator:
+    description: 'Abre el panel del rango moderador (incluye lo del helper)'
+    permission: admintools.moderator
+    usage: /moderator
+  admin:
+    description: 'Abre el panel del rango admin (todas las opciones)'
+    permission: admintools.admin
+    usage: /admin
+
   # ---------- sanciones ----------
   ban:
     description: 'Banea permanentemente o aplica la plantilla por defecto'
@@ -384,6 +398,7 @@ permissions:
       admintools.chat.clear: true
       admintools.chat.slowmode: true
       admintools.investigate.alts: true
+      admintools.investigate.case: true
       admintools.investigate.snapshot: true
       admintools.jail.manage: true
       admintools.rollback.view: true
