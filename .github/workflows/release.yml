@@ -1,0 +1,64 @@
+name: release
+
+# Al etiquetar la versión (git tag v0.5.1 && git push origin v0.5.1) compila,
+# comprueba que la etiqueta coincide con gradle.properties y publica la release
+# con el jar «gordo» y las notas del CHANGELOG.md.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Comprueba que la etiqueta es la versión del proyecto
+        run: |
+          VERSION="$(sed -n 's/^version=//p' gradle.properties)"
+          if [ "${GITHUB_REF_NAME#v}" != "$VERSION" ]; then
+            echo "::error::La etiqueta ${GITHUB_REF_NAME} no coincide con gradle.properties (${VERSION})"
+            exit 1
+          fi
+
+      - name: Compilar y probar
+        run: ./gradlew build --no-daemon
+
+      - name: Notas de la versión
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" {flag=1; next}
+            /^## \[/ && flag {flag=0}
+            flag' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "Sin notas en CHANGELOG.md para ${VERSION}; se publica con un aviso." > release-notes.md
+          fi
+          cat release-notes.md
+
+      - name: Preparar el jar (sin el -plain)
+        run: |
+          mkdir -p dist
+          cp build/libs/AdminTools-*.jar dist/
+          rm -f dist/*-plain.jar
+          ls -l dist
+
+      - name: Publicar la release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: AdminTools ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: dist/*.jar
+          fail_on_unmatched_files: true
