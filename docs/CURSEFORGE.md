@@ -23,6 +23,26 @@ Guárdalo en `.env` (ignorado por git):
 CURSEFORGE_TOKEN=…
 ```
 
+**Comprobado el 2026-10-30:** con el token actual, `GET /api/game/versions?token=…` y la cabecera
+`X-Api-Token` devuelven **200**, mientras que `api.curseforge.com/v1/games` con `x-api-key`
+devuelve **403**: es decir, el token que tienes **sí es el de autor** (el que sube) y no sirve para
+la API de lectura de Studios. Justo lo que hace falta.
+
+### IDs de versión de juego (necesarios para subir)
+
+Leídos con el propio token (`GET /api/game/versions`). Los que interesan a nuestros proyectos:
+
+| Versión | ID (tipo 1) | ID (tipo de la propia versión) |
+|---|---|---|
+| 26.1 | 16083 | 15933 (tipo 83806 «Minecraft 26.1») |
+| 26.1.1 | 16084 | 16021 (tipo 83806) |
+| 26.1.2 | 16085 | 16082 (tipo 83806) |
+| 26.2 | 16500 | 16498 (tipo 86297) |
+| 26.3 | 17046 | 17045 (tipo 88556) |
+
+Al subir se prueban primero los del tipo 1 (la lista general de Minecraft); si CurseForge rechaza el
+par, se usan los de la tabla derecha.
+
 ## 2. Crear los proyectos (manual)
 
 <https://authors.curseforge.com> → **Create project** → juego **Minecraft** → rellenar.
