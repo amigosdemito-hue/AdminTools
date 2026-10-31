@@ -26,7 +26,8 @@ Estado: **plugin funcional y verificado** (compila, carga en Paper 26.1.2 y resp
 Detalle completo de cada función en [docs/LISTA-FUNCIONES.md](docs/LISTA-FUNCIONES.md) y la
 referencia de comandos y permisos en [docs/COMANDOS-Y-PERMISOS.md](docs/COMANDOS-Y-PERMISOS.md).
 El historial de versiones está en [CHANGELOG.md](CHANGELOG.md) y el material para publicar en
-[docs/SUBIDA-GITHUB-MODRINTH.md](docs/SUBIDA-GITHUB-MODRINTH.md).
+[docs/SUBIDA-GITHUB-MODRINTH.md](docs/SUBIDA-GITHUB-MODRINTH.md) (GitHub + Modrinth) y
+[docs/CURSEFORGE.md](docs/CURSEFORGE.md) (CurseForge, con las plantillas de los tres proyectos).
 
 ---
 

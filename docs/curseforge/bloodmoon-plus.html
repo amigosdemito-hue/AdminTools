@@ -1,0 +1,60 @@
+<h2>🩸 BloodMoonPlus — Blood Moon</h2>
+<p>A <strong>Blood Moon</strong> event plugin for Paper servers, featuring <strong>fixed schedules (Mexico time)</strong>, <strong>9 bosses</strong>, <strong>45 items</strong> spread across rarities, enchantments up to <strong>level 7</strong>, <strong>progressive waves</strong>, <strong>placeholders</strong>, multi-language support, <strong>full immersion</strong> (red fog, lightning, ambient sounds and constant announcements) and <strong>rare-loot inventory delivery</strong>.</p>
+<p>Built to run smoothly on <strong>40+ player</strong> servers without changing the gameplay.</p>
+<hr/>
+<h3>✨ Highlights</h3>
+<ul><li><strong>🗓️ Fixed schedules</strong> — <code>weekly</code> mode (per weekday at a real time, configurable timezone, defaults to <code>America/Mexico_City</code>) or <code>interval</code> mode (every N hours). You can set <strong>multiple runs on the same day</strong>.</li><li><strong>🌐 Server-wide event</strong> — one Blood Moon for <strong>every loaded world at the same time</strong> (<code>event.global: true</code>): night, hordes, bosses, the boss bar and survivor rewards all run everywhere together. Set it to <code>false</code> to go back to a <code>worlds</code> list.</li><li><strong>👹 9 bosses</strong> with custom health bars, <strong>enrage</strong> phases, minimum difficulty, abilities and their own loot.</li><li><strong>🎁 45 items</strong> sorted by rarity: common (always drop), rare, epic, legendary and <strong>mythic</strong> (extremely rare, ~0.1%).</li><li><strong>📦 Rare loot delivery</strong>: rare, epic, legendary and mythic drops now go straight to the killer's inventory when there is one.</li><li><strong>⚔️ Custom enchantments</strong> up to <strong>level 7</strong>, each with unique abilities (crit, thunder guard, blast wave, levitate, bleeding…).</li><li><strong>🌊 Progressive waves</strong> — wave 1: 5 mobs, wave 2: 10, wave 3: 15… up to a configurable cap.</li><li><strong>🌫️ Immersion</strong> — red fog, lightning when hordes/bosses appear, ambient sounds and periodic announcements. No rain, but thunder.</li><li><strong>📊 Stats &amp; survivors</strong> — who survived, who dealt the most damage, rankings and MVP rewards.</li><li><strong>🌍 Multi-language (i18n)</strong> and <strong>per-world configuration</strong>.</li><li><strong>🔌 Optional integrations</strong> with PlaceholderAPI, Multiverse-Core and WorldGuard (MythicMobs as an alternative mode).</li><li><strong>🚫 Wither control</strong> — the normal Wither is blocked; only the <strong>Crimson Scourge</strong> boss can spawn.</li></ul>
+<hr/>
+<h3>📥 Installation</h3>
+<ol><li>Download the <code>.jar</code> from the <strong>Versions</strong> tab.</li><li>Drop it into the <code>plugins/</code> folder of your <strong>Paper</strong> server.</li><li>Restart the server.</li><li>(Optional) Install <strong>PlaceholderAPI</strong> for placeholders.</li><li>Configure <code>plugins/BloodMoonPlus/config.yml</code> and run <code>/luna reload</code>.</li></ol>
+<blockquote><p>Requires <strong>Paper</strong>. Compatible with Paper <strong>26.2</strong> and <strong>26.3</strong>.</p></blockquote>
+<hr/>
+<h3>🎮 Commands</h3>
+<p>Main command: <strong><code>/luna</code></strong> (aliases: <code>/bm</code>, <code>/lunadesangre</code>, <code>/bloodmoon</code>).</p>
+<table><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody><tr><td><code>/luna next</code></td><td>Shows the next Blood Moon</td></tr><tr><td><code>/luna start [difficulty]</code></td><td>Starts the event manually</td></tr><tr><td><code>/luna stop</code></td><td>Stops the event</td></tr><tr><td><code>/luna difficulty &lt;n&gt;</code></td><td>Adjusts the difficulty of the current event</td></tr><tr><td><code>/luna boss &lt;id&gt;</code></td><td>Summons a specific boss</td></tr><tr><td><code>/luna horde</code></td><td>Forces a wave</td></tr><tr><td><code>/luna killmobs</code></td><td>Removes the event mobs</td></tr><tr><td><code>/luna give &lt;item&gt; [amount]</code></td><td>Gives one of the plugin's items</td></tr><tr><td><code>/luna items</code></td><td>Lists the available items</td></tr><tr><td><code>/luna chances</code></td><td>Shows the drop chances</td></tr><tr><td><code>/luna reload</code></td><td>Reloads the configuration</td></tr></tbody></table>
+<h4>Permissions</h4>
+<table><thead><tr><th>Permission</th><th>Description</th><th>Default</th></tr></thead><tbody><tr><td><code>bloodmoon.use</code></td><td>View status and upcoming events</td><td>Everyone</td></tr><tr><td><code>bloodmoon.admin</code></td><td>Manage the event</td><td>OP</td></tr></tbody></table>
+<hr/>
+<h3>🗓️ Schedules &amp; difficulty</h3>
+<p>In <code>weekly</code> mode, each entry accepts either a simple time or a block with difficulty and duration:</p>
+<pre><code>schedule:
+  mode: weekly
+  timezone: America/Mexico_City
+  days:
+    MONDAY:
+      - time: &quot;21:30&quot;
+        difficulty: 1
+        duration-minutes: 20
+    FRIDAY:
+      - time: &quot;13:40&quot;
+        difficulty: 2
+        duration-minutes: 20
+      - time: &quot;20:40&quot;        # two runs on the same day
+        difficulty: 3
+        duration-minutes: 25</code></pre>
+<p><strong>Difficulty</strong> is a continuous multiplier (0.1 – 10.0). It scales health, damage, speed, wave size, spawn rate, loot chance and rarity luck.</p>
+<hr/>
+<h3>🩸 Bosses</h3>
+<table><thead><tr><th>Boss</th><th>Min. difficulty</th></tr></thead><tbody><tr><td>Bloody Zombie King</td><td>1.0</td></tr><tr><td>Bone Sentinel</td><td>1.0</td></tr><tr><td>Crimson Archer</td><td>1.0</td></tr><tr><td>Shadow Hunter</td><td>1.0</td></tr><tr><td>Crimson Necromancer</td><td>1.5</td></tr><tr><td>Ancestral Devastator</td><td>1.5</td></tr><tr><td>Night Executioner</td><td>1.5</td></tr><tr><td>Abyssal Warden</td><td>2.0</td></tr><tr><td>Crimson Scourge (Wither)</td><td>2.5</td></tr></tbody></table>
+<p>Every boss has a health bar, <strong>enrage</strong> phases and its own loot table. See the project's full <strong>README</strong> for every drop in detail.</p>
+<hr/>
+<h3>🧩 Placeholders</h3>
+<p>With <strong>PlaceholderAPI</strong> installed (namespace <code>%bloodmoon_*%</code>): event status, time left, next moon, difficulty, live bosses, current wave, survivors, player stats and more.</p>
+<hr/>
+<h3>🚫 Wither datapack (optional)</h3>
+<p>The plugin already blocks the normal Wither on its own. If you also want a data-layer safeguard, the project ships the <strong>BloodMoonWitherControl</strong> datapack (in <code>datapacks/</code>), which removes any Wither that is <strong>not</strong> the Blood Moon boss. It is optional.</p>
+<hr/>
+<h3>⚡ Performance</h3>
+<p>Designed for <strong>~40 player</strong> networks: local (not whole-world) entity scans, item-parse caching, optimized placeholder snapshots and efficient menus/action bars. For very large servers you can tune <code>horde.wave-max-size</code> and <code>horde.max-alive-per-player</code> in the config.</p>
+<hr/>
+<h3>🛠️ Build from source</h3>
+<pre><code>git clone &lt;your-repository&gt;
+cd BloodMoonPlus
+./gradlew build</code></pre>
+<p>The <code>.jar</code> is produced in <code>build/libs/</code>. Built with <strong>Java 25</strong>.</p>
+<hr/>
+<h3>🔒 License</h3>
+<p><strong>All rights reserved.</strong> The source code is public for reading and security review only; copying, modifying, reusing or redistributing it is <strong>not</strong> allowed. You may download and run the compiled plugin on your server. See the <code>LICENSE</code> file for details.</p>
+<hr/>
+<h3>❤️ Credits</h3>
+<p>Inspired by — and built to surpass — <em>BloodMoon-Reborn</em>. Made with care for Spanish-speaking communities. 🌙🩸</p>

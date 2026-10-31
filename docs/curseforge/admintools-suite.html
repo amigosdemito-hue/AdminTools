@@ -1,0 +1,68 @@
+<h2>AdminTools</h2>
+<p><strong>All-in-one administration suite for Minecraft Java servers running Paper 26.1 and newer.</strong></p>
+<p>Built on Java 25 with Gradle, tested against Paper 26.1.2: 70+ commands, ~50 permission nodes with inheritance, three staff ranks, an English/Spanish message system and a full reference manual. SQLite out of the box, MySQL when you run a network of servers.</p>
+<hr/>
+<h3>What you get</h3>
+<h4>1. Punishments</h4>
+<ul><li><code>ban</code>, <code>tempban</code>, <code>ipban</code>, <code>mute</code>, <code>tempmute</code>, <code>ipmute</code>, <code>shadowmute</code>, <code>warn</code>, <code>tempwarn</code>, <code>kick</code></li><li>Full history with <code>/history</code>, staff notes with <code>/notes</code>, reversion with <code>/unpunish</code></li><li><strong>Templates</strong> (<code>/punish hacking</code>, <code>xray</code>, <code>grief</code>, <code>insultos</code>, <code>spam</code>, <code>publicidad</code>, <code>evadir-staff</code>)</li></ul>
+<p>and <strong>escalation ladders</strong> (<code>/ladder chat</code>, <code>publicidad</code>, <code>cheating</code>) that step up automatically while the player keeps misbehaving inside the window</p>
+<ul><li><strong>Per-rank duration limits</strong>: helper 1 day, moderator 30 days, admin permanent. Cross the limit and</li></ul>
+<p>the plugin clamps it instead of letting a junior staff member overreach</p>
+<ul><li>Punish <strong>by name</strong> players who have never joined: the sanction sticks to the name and is applied</li></ul>
+<p>the first time that account connects</p>
+<ul><li>Automatic expiry, join warnings, auto-escalation after 3 warnings in 30 days, announce to the</li></ul>
+<p>server, silent mode (<code>-s</code>), protection for higher ranks and exempt nodes</p>
+<h4>2. Jails (based on xJail, rebuilt)</h4>
+<ul><li>Cells with position and a square return radius (<code>/setjail &lt;name&gt; [radius]</code>, 2 blocks = 5×5 by</li></ul>
+<p>default), <strong>random cell</strong> on sentencing, <code>/jailtp</code>, <code>/jaillist</code>, <code>/jailtime</code>, <code>/unjail</code></p>
+<ul><li>The prisoner's <strong>full inventory is confiscated and returned without duplicates</strong> — armour,</li></ul>
+<p>offhand included; if the sentence ends while offline, it is handed over on the next login</p>
+<ul><li>Adventure mode during the sentence (no ghost blocks for Bedrock/Geyser players), block breaking,</li></ul>
+<p>placing, interaction, damage, ender pearls and chorus fruit all blocked</p>
+<ul><li>Instant teleport back the moment they cross the boundary — an open gate is not an escape</li><li>Allowed commands configurable, staff notifications, escape handling, release to the original</li></ul>
+<p>position and <code>/jailimport</code> to migrate cells and prisoners from xJail (with <code>--dry</code> to simulate)</p>
+<h4>3. Inventory rollback</h4>
+<p>Inspired by InventoryRollbackPlus and extended: complete snapshots of inventory, enderchest, position, health, hunger, XP and game mode.</p>
+<ul><li>Automatic copies on join, quit, death, world change and on an optional interval</li><li>Menu-driven: players → snapshots → contents → enderchest → actions → confirmation</li><li><strong>Selective restore</strong> (<code>items</code>, <code>ender</code>, <code>position</code>, <code>stats</code>, <code>all</code>) and <strong>single-slot restore</strong></li><li>A safety copy is saved before every restore, so a wrong click is undone</li><li>Per-reason retention (<code>rollback.keep</code>), <code>/rollback save</code>, <code>/rollback purge &lt;days&gt;</code>, read-only menus</li></ul>
+<h4>4. Staff tools</h4>
+<ul><li><strong>Vanish</strong> that survives reconnects and restarts, hides join messages, blocks mob targeting,</li></ul>
+<p>stops item/XP pickup, opens <strong>every container without animation or sound</strong> (chests, barrels, shulkers, hoppers, furnaces, crafter, enderchest, anvils, carts…), silences doors and levers, and does not appear in death or advancement messages. Staff in vanish see each other with a <strong>rank-coloured glow</strong> (green / yellow / red)</p>
+<ul><li><strong>Staff mode</strong> with fly, god mode, invulnerability, a hotbar of tools (compass = player list and</li></ul>
+<p>teleport, blaze rod = freeze, clock = vanish, book = profile) and the original inventory restored on exit</p>
+<ul><li><strong>Spectator patrol</strong> for real watching: 5 minutes active, 15 minutes cooldown, persisted</li><li><code>/freeze</code>, <code>/follow</code>, <code>/tp</code>, <code>/tphere</code>, <code>/tppos</code>, <code>/back</code>, <code>/heal</code>, <code>/feed</code>, <code>/fly</code>, <code>/god</code>,</li></ul>
+<p><code>/gamemode</code>, <code>/clear</code>, <code>/invsee</code>, <code>/enderchest</code>, <code>/spy</code>, <code>/cspy</code>, <code>/duty</code>, <code>/seen</code>, <code>/playtime</code>, <code>/staffchat</code>, <code>/stafflist</code></p>
+<h4>5. Reports, chat and investigation</h4>
+<ul><li><code>/report</code> with cooldown, open limit, staff notification, claim/resolve/reject flow with notes and</li></ul>
+<p>delivery to a Discord channel</p>
+<ul><li><code>/reports</code> queue, <code>/chatlog</code>, <code>/case</code> (sanctions + notes + reports + chat + snapshots),</li></ul>
+<p><code>/alts</code> (accounts sharing an IP), <code>/check</code> (profile, active sanctions, last anticheat flag)</p>
+<ul><li>Chat: anti-spam, anti-caps, regex filters, anti-advertising with automatic punishment after N</li></ul>
+<p>detections, cooldown, slow mode, <code>/clearchat</code> and <code>/muteall</code></p>
+<ul><li><code>/snapshot</code> and <code>/restore</code> for evidence, plus <code>/at inspect</code> and <code>/at rollback</code> through CoreProtect</li></ul>
+<h4>6. Panels for every rank</h4>
+<p><code>/helper</code>, <code>/moderator</code> and <code>/admin</code> open a panel with <strong>only the actions that rank may perform</strong> — each button runs the real command as the player, so panels never bypass permissions, limits or auditing. Three interchangeable interfaces:</p>
+<table><thead><tr><th><code>panel.ui</code></th><th>Java</th><th>Bedrock</th></tr></thead><tbody><tr><td><code>auto</code> (default)</td><td>native dialog (1.21.6+)</td><td>native Floodgate form when installed</td></tr><tr><td><code>inventory</code></td><td>classic chest menu</td><td>classic chest menu</td></tr><tr><td><code>dialog</code></td><td>native dialog</td><td>dialog rendered by Geyser</td></tr></tbody></table>
+<p>Missing values (player, duration, reason) are asked in chat and never broadcast.</p>
+<h4>7. Discord integration</h4>
+<ul><li><strong>Sanction announcements</strong> to a public channel: skin head, type, duration with a <strong>live countdown</strong></li></ul>
+<p>and the issuing staff member; when it expires, a second embed announces the end</p>
+<ul><li><strong>A copy to the staff channel</strong> signed by whoever issued the sanction</li><li><strong>Staff action log</strong>: every command and tool used by helpers, moderators and admins, batched every</li></ul>
+<p>3 seconds; passwords and 2FA never logged, reasons stripped of <code>@everyone</code></p>
+<ul><li>Reports delivered to their own channel; alert webhooks for sanctions, performance and anticheats</li></ul>
+<h4>8. Operations</h4>
+<ul><li>Watchdog for TPS/MSPT/RAM/disk with thresholds and alerts (<code>/watchdog</code>)</li><li>Maintenance mode, scheduled restarts with countdown and cancel, automatic backups with rotation</li><li>Full staff auditing (<code>/audit</code>), per-minute action limits, two-step confirmation on destructive</li></ul>
+<p>commands, chat and IP retention purges, <code>/at reload</code></p>
+<hr/>
+<h3>Ranks</h3>
+<table><thead><tr><th>Rank</th><th>What it can do</th></tr></thead><tbody><tr><td><strong>helper</strong></td><td>warnings, mutes up to 1 day, kick, jail use, vanish, freeze, teleport, follow, reports queue, <code>/chatlog</code>, <code>/check</code></td></tr><tr><td><strong>moderator</strong></td><td>everything above + bans up to 30 days, templates, ladders, staff mode, spy, invsee/enderchest, <code>/case</code>, <code>/alts</code>, snapshots, chat moderation, rollback view/restore</td></tr><tr><td><strong>admin</strong></td><td>everything above + permanent bans, IP bans/mutes, reversion, muteall, maintenance, restarts, backups, audit, watchdog, reload, jails management import</td></tr></tbody></table>
+<p>LuckPerms groups are wired for you (<code>admintools.helper</code>, <code>admintools.moderator</code>, <code>admintools.admin</code> with inheritance already declared), so one permission grants the whole rank.</p>
+<hr/>
+<h3>Installation</h3>
+<ol><li>Drop <code>AdminTools-x.y.z.jar</code> into <code>plugins/</code>.</li><li>Start the server: SQLite database, Spanish messages and default config are created automatically.</li><li>Edit <code>plugins/AdminTools/config.yml</code> (storage, jail, rollback, Discord, panel UI, chat rules).</li><li>Grant ranks with LuckPerms: <code>/lp group helper permission set admintools.helper true</code>.</li></ol>
+<p>Requires Paper <strong>26.1 or newer</strong> (Java 25). Nothing else is mandatory.</p>
+<h3>Optional integrations</h3>
+<p>LuckPerms (ranks and prefixes), CoreProtect (block lookup and rollback), PlaceholderAPI, Vault (economy in the staff menu), Floodgate/Geyser (native Bedrock forms), and an anticheat bridge (<code>/at acalert</code>) that feeds Grim, Vulcan, Matrix, Spartan or Polar flags straight into <code>/check</code>.</p>
+<h3>Documentation</h3>
+<p>Everything is written down in the repository: a full command and permission reference, a handbook per rank with protocols for semi-anarchy servers, a function list, security audits and this changelog. Messages ship in Spanish and English (<code>messages_es.yml</code>, <code>messages_en.yml</code>) and are fully editable — including every colour and every screen (ban, jail, freeze, maintenance).</p>
+<h3>License</h3>
+<p><strong>All rights reserved.</strong> The repository is public for reading and compiling for your own server; copying, modifying, redistributing or monetizing the code is not allowed without written permission. Not affiliated with Mojang Studios, Microsoft or Modrinth.</p>
