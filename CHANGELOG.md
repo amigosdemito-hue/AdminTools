@@ -5,6 +5,23 @@ y el proyecto se versiona con [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.5.2] — 2026-10-30
+
+Primera publicación del proyecto.
+
+### Añadido
+
+- Repositorio público en GitHub con integración continua (`build.yml`) y workflow de
+  release por etiquetas (`release.yml`).
+- Proyecto **`admintools-suite`** en Modrinth con icono, metadatos y versión 0.5.2 subidos
+  (`admintools` pertenece a otro autor).
+- `assets/admintools-icon.png`, el icono de 512×512 del proyecto.
+- `LICENSE` con todos los derechos reservados: el repo es público para consulta, no es código abierto.
+
+Sin cambios de código respecto a 0.5.1: es la misma versión preparada para distribuir.
+
+---
+
 ## [0.5.1] — 2026-10-30
 
 ### Añadido
@@ -84,6 +101,7 @@ y el proyecto se versiona con [SemVer](https://semver.org/lang/es/).
 
 ---
 
+[0.5.2]: https://github.com/amigosdemito-hue/AdminTools/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/amigosdemito-hue/AdminTools/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/amigosdemito-hue/AdminTools/compare/v0.4.5...v0.5.0
 [0.4.5]: https://github.com/amigosdemito-hue/AdminTools/compare/v0.4.0...v0.4.5

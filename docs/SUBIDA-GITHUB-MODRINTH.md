@@ -19,8 +19,8 @@ aún**: este documento es el preparado para que la subida sea un solo repaso.
 | Tests (`./gradlew build`) | ✅ 43 pruebas |
 | Remoto de GitHub | ✅ `github.com/amigosdemito-hue/AdminTools` (público), subido y CI en verde |
 | `release.yml` (jar adjunto en cada etiqueta) | ✅ listo, se dispara con `git tag` |
-| Proyecto publicado en Modrinth | ⏳ pendiente: slug `admintools` ocupado → se usa **`admintools-suite`** y el `MODRINTH_TOKEN` actual devuelve 401 (hay que generar otro PAT) |
-| Release `v0.5.1` con el jar | ⏳ pendiente de la etiqueta (`git tag v0.5.1 && git push origin v0.5.1`) |
+| Proyecto publicado en Modrinth | ✅ `admintools-suite` (id `Ii9JUmjd`) creado, con icono y versión **0.5.2** subidos; estado `processing` (revisión de Modrinth) con publicación solicitada |
+| Release de GitHub con el jar | ⏳ pendiente de la etiqueta: `git tag v0.5.2 && git push origin v0.5.2` |
 
 ---
 
@@ -42,11 +42,12 @@ ls build/libs/               # debe salir AdminTools-<versión>.jar y un -plain.
 
 ```bash
 # 1) primer push (una sola vez) — GitHub CLI ya autenticado como amigosdemito-hue
-gh repo create AdminTools --public --source . --remote origin --push
+gh repo create AdminTools --public --source . --remote origin --push   # ya hecho
 
 # 2) etiqueta de versión (dispara release.yml y publica la release con el jar)
-git tag v0.5.1
-git push origin v0.5.1
+#    el sufijo debe coincidir con gradle.properties (hoy: 0.5.2)
+git tag v0.5.2
+git push origin v0.5.2
 ```
 
 - El workflow `.github/workflows/release.yml` compila con Java 25, sube el jar como artefacto de la
@@ -64,34 +65,48 @@ git push origin v0.5.1
 | Campo | Valor |
 |---|---|
 | Slug | `admintools-suite` (título visible: **AdminTools**; `admintools` está ocupado por otro autor) |
-| Categoría | `utility` · `management` (secundarias: `admin-tools`) |
-| Carga (loader) | `paper` |
-| Versiones de juego | `26.1` y superiores |
-| Licencia | **All Rights Reserved** (`arr` en la API; archivo `LICENSE`: público para consulta, sin permiso de redistribución) |
+| Categoría | `management` · `utility` (secundaria: `social`) |
+| Carga (loader) | `paper`, `purpur`, `folia` |
+| Versiones de juego | `26.1`, `26.1.1`, `26.1.2`, `26.2`, `26.3` |
+| Licencia | **All Rights Reserved** (`LicenseRef-All-Rights-Reserved`; archivo `LICENSE`) |
 | Fuente | URL del repositorio de GitHub |
 | Resumen (≤256) | Suite de administración para servidores Paper 26.1+: sanciones, celdas, rollback, reportes y paneles por rango (helper, moderador, admin) con interfaz de inventario, diálogos y formularios de Bedrock. |
 | Dependencias | Ninguna obligatoria. Opcionales: LuckPerms, CoreProtect, PlaceholderAPI, Floodgate/Geyser, Vault. |
 
-### 3.2 Publicar la versión (API)
+### 3.2 Publicar una versión (API, probada)
+
+El token vive en el entorno o en `.env` (ignorado por git). **Nunca** en el repositorio ni en el chat.
 
 ```bash
-export MODRINTH_TOKEN="***"        # nunca en el repositorio: - MODRINTH_TOKEN, en el entorno
+t="# lee el PAT de .env sin imprimirlo"
+T=$(sed -n 's/^MODRINTH_TOKEN=//p' .env)
 
-curl -X POST "https://api.modrinth.com/v2/version" \
-  -H "Authorization: $MODRINTH_TOKEN" \
-  -H "Content-Type: multipart/form-data" \
-  -F "data='{
-        "project_id": "<id-del-proyecto>",
-        "name": "AdminTools 0.5.1",
-        "version_number": "0.5.1",
-        "game_versions": ["26.1"],
-        "loaders": ["paper"],
-        "version_type": "release",
-        "changelog": "$(sed -n '/^## \[0.5.1\]/,/^---$/p' CHANGELOG.md | sed 's/"/\\"/g')",
-        "dependencies": []
-      }' \
-  -F "file=@build/libs/AdminTools-0.5.1.jar"
+# 1) metadatos de la versión (project_id y file_parts van dentro del JSON)
+python - <<'PY'
+import json
+ch = open('CHANGELOG.md', encoding='utf-8').read().split('## [0.5.2]', 1)[1].split('---', 1)[0]
+json.dump({"name": "AdminTools 0.5.2", "version_number": "0.5.2",
+           "game_versions": ["26.1", "26.1.1", "26.1.2", "26.2", "26.3"],
+           "loaders": ["paper", "purpur", "folia"], "version_type": "release",
+           "changelog": ch.strip(), "featured": True, "status": "listed",
+           "project_id": "Ii9JUmjd", "file_parts": ["file0"], "primary_file": "file0",
+           "environment": "server_only", "dependencies": []},
+          open('run/mr-version.json', 'w', encoding='utf-8'), ensure_ascii=False)
+PY
+
+# 2) subida (multipart: parte "data" con el JSON + parte con el jar)
+curl -X POST "https://api.modrinth.com/v2/version" -H "Authorization: $T" \
+  -F "data=@run/mr-version.json" -F "file0=@build/libs/AdminTools-0.5.2.jar"
 ```
+
+Otros detalles que costaron averiguar y ya no deberían costarlo:
+
+| Acción | Llamada |
+|---|---|
+| Crear el proyecto | `POST /v2/project` con `-F "data=@proyecto.json"`; el JSON necesita `client_side`, `server_side` e `initial_versions: []` |
+| Subir el icono | `PATCH /v2/project/<id>/icon?ext=png` con **el PNG como cuerpo crudo** (`--data-binary @icon.png`), no como multipart |
+| Descripción | Si está en español salta el aviso obligatorio `project_description_non_english`: se publica **en inglés** |
+| Estado | `PATCH /v2/project/<id>` con `{"requested_status":"approved"}` para pedir publicación; el estado pasa a `processing` (revisión) |
 
 Manual: Modrinth → *Dashboard* → *Create project* → *Upload version*, elegir el jar y pegar el
 bloque de la versión del `CHANGELOG.md` en la descripción.
